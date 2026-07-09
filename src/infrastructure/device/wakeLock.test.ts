@@ -24,6 +24,19 @@ describe('createWakeLock', () => {
     expect(disable).toHaveBeenCalled();
   });
 
+  it('falls back to NoSleep when the Wake Lock API request rejects (iOS)', async () => {
+    const enable = vi.fn();
+    const disable = vi.fn();
+    const request = vi.fn(async () => { throw new DOMException('denied', 'NotAllowedError'); });
+    const nav = { wakeLock: { request } } as unknown as Navigator;
+    const wl = createWakeLock(nav, () => ({ enable, disable }));
+    await wl.acquire();
+    expect(request).toHaveBeenCalledWith('screen');
+    expect(enable).toHaveBeenCalled();
+    await wl.release();
+    expect(disable).toHaveBeenCalled();
+  });
+
   it('does not leak a previously-enabled NoSleep fallback on re-acquire', async () => {
     const instances: Array<{ enable: ReturnType<typeof vi.fn>; disable: ReturnType<typeof vi.fn> }> = [];
     const nav = {} as Navigator;

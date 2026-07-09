@@ -18,8 +18,14 @@ export function createWakeLock(
 
   async function acquire(): Promise<void> {
     if (supported) {
-      sentinel = await (nav as WakeLockNavigator).wakeLock!.request!('screen');
-      return;
+      try {
+        sentinel = await (nav as WakeLockNavigator).wakeLock!.request!('screen');
+        return;
+      } catch {
+        // iOS may reject the request (e.g. outside a user gesture, or an
+        // implementation quirk); fall back to the NoSleep video hack.
+        sentinel = null;
+      }
     }
     noSleep ??= makeNoSleep();
     noSleep.enable();

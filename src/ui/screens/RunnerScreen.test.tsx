@@ -78,15 +78,24 @@ function renderRunnerWithoutNavigationState() {
   );
 }
 
-async function advanceToHold() {
-  await act(async () => { vi.advanceTimersByTime(120_000); });
-  expect(screen.getByText(/^hold$/i)).toBeInTheDocument();
-}
-
 async function flushAsyncWork() {
   for (let i = 0; i < 5; i += 1) {
     await act(async () => { await Promise.resolve(); });
   }
+}
+
+// The runner gates the session behind an explicit Start tap so the wake lock is
+// acquired inside a user gesture (required by iOS).
+async function startSession() {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /start session/i }));
+  });
+  await flushAsyncWork();
+}
+
+async function advanceToHold() {
+  await act(async () => { vi.advanceTimersByTime(120_000); });
+  expect(screen.getByText(/^hold$/i)).toBeInTheDocument();
 }
 
 afterEach(() => {
@@ -94,9 +103,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('acquires a wake lock when the runner mounts', async () => {
+it('acquires a wake lock when the session starts (from a user gesture)', async () => {
   const acquire = vi.fn(async () => {});
   renderRunner({ wakeLock: { ...noopWakeLock, acquire } });
+  // Not acquired on mount — only after the user taps Start.
+  expect(acquire).not.toHaveBeenCalled();
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /start session/i }));
+  });
   await waitFor(() => expect(acquire).toHaveBeenCalled());
   expect(screen.getByText(/breathe up/i)).toBeInTheDocument();
 });
@@ -107,6 +121,7 @@ it('persists once and navigates to summary when the final hold ends without a re
   const setState = vi.fn(async () => {});
   renderRunner({ setState });
 
+  await startSession();
   await advanceToHold();
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /end hold/i })); });
   await flushAsyncWork();
@@ -121,6 +136,7 @@ it('records the actual hold duration instead of the target hold duration', async
   const clock = new FakeClock(10_000);
   renderRunner({ clock });
 
+  await startSession();
   await advanceToHold();
   clock.advance(40_000);
   await act(async () => { vi.advanceTimersByTime(40_000); });
@@ -139,6 +155,7 @@ it('records zero achieved hold when tapping out during recover before the next h
   const setState = vi.fn(async (state: AppState) => { savedStates.push(state); });
   renderRunner({ plan: twoRoundPlan, clock, setState });
 
+  await startSession();
   await advanceToHold();
   clock.advance(60_000);
   await act(async () => { vi.advanceTimersByTime(60_000); });
@@ -165,6 +182,7 @@ it('uses the eased recover duration after tapping out a hold', async () => {
   vi.useFakeTimers();
   renderRunner({ plan: twoRoundPlan });
 
+  await startSession();
   await advanceToHold();
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /i tapped out/i })); });
 

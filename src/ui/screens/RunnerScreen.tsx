@@ -26,6 +26,7 @@ export function RunnerScreen() {
   const finish = useRunnerStore((s) => s.finish);
   const complete = useAppStore((s) => s.completeSession);
   const [contractions, setContractions] = useState(0);
+  const [started, setStarted] = useState(false);
   const [pendingRecoverAdvance, setPendingRecoverAdvance] = useState(false);
   const holdStartedAt = useRef<number | null>(null);
   const hasFinished = useRef(false);
@@ -37,14 +38,21 @@ export function RunnerScreen() {
     onPhaseChange: (p) => cue.phaseCue(p),
   });
 
+  // Release the wake lock when leaving the runner.
   useEffect(() => {
-    if (!hasUsablePlan || !navPlan) return;
-    wakeLock.acquire();
-    start(navPlan, nav?.difficultyLevel ?? 0);
-    timer.begin();
-    return () => { wakeLock.release(); };
+    return () => { void wakeLock.release(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function beginSession() {
+    if (started || !navPlan) return;
+    // Acquire the wake lock inside this user gesture: iOS requires a user
+    // activation for navigator.wakeLock.request and for the NoSleep fallback.
+    await wakeLock.acquire();
+    start(navPlan, nav?.difficultyLevel ?? 0);
+    timer.begin();
+    setStarted(true);
+  }
 
   useEffect(() => {
     if (!pendingRecoverAdvance) return;
@@ -88,6 +96,19 @@ export function RunnerScreen() {
 
   if (!hasUsablePlan) {
     return <Navigate to="/train" replace />;
+  }
+
+  if (!started) {
+    return (
+      <div className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 px-6 py-6">
+        <h2 className="text-2xl font-bold">{plan.type} session</h2>
+        <p className="text-sm text-[color:var(--text-dim)]">
+          {plan.rounds.length} rounds. The screen stays awake during the session.
+          Dry land only — never in or near water alone.
+        </p>
+        <Button onClick={beginSession}>Start session</Button>
+      </div>
+    );
   }
 
   if (timer.phase === 'done') {
