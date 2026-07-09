@@ -15,12 +15,13 @@ export function RunnerScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = location.state as RunnerNavState | null;
-  const { wakeLock, cues } = useServices();
+  const { clock, wakeLock, cues } = useServices();
   const start = useRunnerStore((s) => s.start);
   const recordRound = useRunnerStore((s) => s.recordRound);
   const finish = useRunnerStore((s) => s.finish);
   const complete = useAppStore((s) => s.completeSession);
   const [contractions, setContractions] = useState(0);
+  const holdStartedAt = useRef<number | null>(null);
   const hasFinished = useRef(false);
 
   const plan = nav?.plan ?? { type: 'CO2', rounds: [] };
@@ -37,6 +38,10 @@ export function RunnerScreen() {
   }, []);
 
   useEffect(() => {
+    if (timer.phase === 'hold') holdStartedAt.current = clock.now();
+  }, [clock, timer.phase, timer.roundIndex]);
+
+  useEffect(() => {
     if (timer.phase !== 'done' || hasFinished.current) return;
     hasFinished.current = true;
     void (async () => {
@@ -46,13 +51,18 @@ export function RunnerScreen() {
     })();
   }, [complete, finish, navigate, timer.phase]);
 
+  function achievedHoldSec() {
+    if (holdStartedAt.current === null) return 0;
+    return Math.max(0, Math.round((clock.now() - holdStartedAt.current) / 1000));
+  }
+
   function tapOut() {
-    recordRound(0, contractions, true);
+    recordRound(achievedHoldSec(), contractions, true);
     setContractions(0);
     timer.endHold();
   }
   function endHold() {
-    recordRound(plan.rounds[timer.roundIndex].targetHoldSec, contractions, false);
+    recordRound(achievedHoldSec(), contractions, false);
     setContractions(0);
     timer.endHold();
   }

@@ -8,6 +8,7 @@ import { SummaryScreen } from './SummaryScreen';
 import { noopWakeLock } from '../../infrastructure/device/noopServices';
 import { emptyAppState } from '../../domain/models/appState';
 import type { SessionPlan } from '../../domain/models/types';
+import { FakeClock } from '../../test/fakeClock';
 
 const shortPlan: SessionPlan = {
   type: 'CO2',
@@ -16,6 +17,7 @@ const shortPlan: SessionPlan = {
 
 function renderRunner({
   plan = shortPlan,
+  clock = new FakeClock(1_000),
   setState = vi.fn(async () => {}),
   wakeLock = noopWakeLock,
 } = {}) {
@@ -25,7 +27,7 @@ function renderRunner({
   };
 
   render(
-    <ServicesProvider value={{ repository, wakeLock }}>
+    <ServicesProvider value={{ clock, repository, wakeLock }}>
       <AppProviders>
         <MemoryRouter initialEntries={[{ pathname: '/runner', state: { plan, difficultyLevel: 0 } }]}>
           <Routes>
@@ -37,7 +39,7 @@ function renderRunner({
     </ServicesProvider>,
   );
 
-  return { repository, setState };
+  return { clock, repository, setState };
 }
 
 async function advanceToHold() {
@@ -76,4 +78,20 @@ it('persists once and navigates to summary when the final hold ends without a re
   expect(screen.getByRole('heading', { name: /session complete/i })).toBeInTheDocument();
   expect(setState).toHaveBeenCalledOnce();
   expect(consoleError.mock.calls.flat().join('\n')).not.toContain('Maximum update depth exceeded');
+});
+
+it('records the actual hold duration instead of the target hold duration', async () => {
+  vi.useFakeTimers();
+  const clock = new FakeClock(10_000);
+  renderRunner({ clock });
+
+  await advanceToHold();
+  clock.advance(40_000);
+  await act(async () => { vi.advanceTimersByTime(40_000); });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /end hold/i })); });
+  await flushAsyncWork();
+
+  expect(screen.getByRole('heading', { name: /session complete/i })).toBeInTheDocument();
+  expect(screen.getByText('0:40')).toBeInTheDocument();
+  expect(screen.queryByText('1:00')).not.toBeInTheDocument();
 });
