@@ -19,7 +19,13 @@ export function createCues(win: Window = window, nav: Navigator = navigator): Cu
   return {
     speak(text: string) {
       if (!w.speechSynthesis || !w.SpeechSynthesisUtterance) return;
-      w.speechSynthesis.speak(new w.SpeechSynthesisUtterance(text));
+      const utter = new w.SpeechSynthesisUtterance(text);
+      // Force English regardless of the device locale (e.g. a Czech phone).
+      utter.lang = 'en-US';
+      const enVoice = (w.speechSynthesis.getVoices?.() ?? [])
+        .find((v) => v.lang?.toLowerCase().startsWith('en'));
+      if (enVoice) utter.voice = enVoice;
+      w.speechSynthesis.speak(utter);
     },
     beep(frequencyHz = 880, durationMs = 150) {
       const audio = ctx();

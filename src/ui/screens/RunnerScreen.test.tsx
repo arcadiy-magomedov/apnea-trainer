@@ -5,7 +5,7 @@ import { ServicesProvider } from '../app/services';
 import { AppProviders } from '../app/stores';
 import { RunnerScreen } from './RunnerScreen';
 import { SummaryScreen } from './SummaryScreen';
-import { noopWakeLock } from '../../infrastructure/device/noopServices';
+import { noopCues, noopWakeLock } from '../../infrastructure/device/noopServices';
 import { emptyAppState } from '../../domain/models/appState';
 import type { AppState, SessionPlan } from '../../domain/models/types';
 import { FakeClock } from '../../test/fakeClock';
@@ -28,6 +28,7 @@ interface RenderRunnerOptions {
   clock?: FakeClock;
   setState?: (state: AppState) => Promise<void>;
   wakeLock?: typeof noopWakeLock;
+  cues?: typeof noopCues;
 }
 
 function renderRunner({
@@ -35,6 +36,7 @@ function renderRunner({
   clock = new FakeClock(1_000),
   setState = vi.fn(async (_state: AppState) => {}),
   wakeLock = noopWakeLock,
+  cues = noopCues,
 }: RenderRunnerOptions = {}) {
   const repository = {
     getState: vi.fn(async () => emptyAppState()),
@@ -42,7 +44,7 @@ function renderRunner({
   };
 
   render(
-    <ServicesProvider value={{ clock, repository, wakeLock }}>
+    <ServicesProvider value={{ clock, repository, wakeLock, cues }}>
       <AppProviders>
         <MemoryRouter initialEntries={[{ pathname: '/runner', state: { plan, difficultyLevel: 0 } }]}>
           <Routes>
@@ -182,4 +184,41 @@ it('eases the recover duration after tapping out a hold', async () => {
 it('redirects home when opened without a navigation plan', async () => {
   expect(() => renderRunnerWithoutNavigationState()).not.toThrow();
   await waitFor(() => expect(screen.getByText('home-root')).toBeInTheDocument());
+});
+
+it('auto-advances a prescribed hold to recovery when the target time elapses', async () => {
+  vi.useFakeTimers();
+  renderRunner({ plan: twoRoundPlan }); // round 0 target 60s
+
+  await startSession();
+  await advanceToHold();
+  // Let the full prescribed 60s hold elapse.
+  await act(async () => { vi.advanceTimersByTime(60_000); });
+  await flushAsyncWork();
+
+  expect(screen.getByText(/^recover$/i)).toBeInTheDocument();
+});
+
+it('beeps the 3-2-1 countdown and go signal leading into the hold', async () => {
+  vi.useFakeTimers();
+  const beep = vi.fn();
+  renderRunner({ cues: { ...noopCues, beep } });
+
+  await startSession();
+  await advanceToHold(); // passes remaining 10, 3, 2, 1, 0 during breathe-up
+
+  // warn(10) + three 3-2-1 ticks + go(0) = at least 4 beeps.
+  expect(beep.mock.calls.length).toBeGreaterThanOrEqual(4);
+});
+
+it('lets the user cancel and leave the session at any time', async () => {
+  vi.useFakeTimers();
+  renderRunner();
+
+  await startSession();
+  await advanceToHold();
+  expect(screen.getByRole('button', { name: /cancel session/i })).toBeInTheDocument();
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /cancel session/i })); });
+
+  expect(screen.getByText('home-root')).toBeInTheDocument();
 });
