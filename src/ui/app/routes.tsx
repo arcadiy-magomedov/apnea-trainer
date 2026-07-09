@@ -15,7 +15,7 @@ function HomeOrOnboarding() {
   const state = useAppStore((s) => s.state);
   const hydrated = useAppStore((s) => s.hydrated);
   if (!hydrated) return null;
-  if (state.baselines.length === 0) return <Navigate to="/onboarding" replace />;
+  if (!state.settings.onboarded) return <Navigate to="/onboarding" replace />;
   return <AppShell><HomeScreen /></AppShell>;
 }
 

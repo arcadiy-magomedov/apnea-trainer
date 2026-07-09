@@ -2,10 +2,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
+import { useAppStore } from '../app/stores';
 
 export function OnboardingScreen() {
   const [acked, setAcked] = useState(false);
   const navigate = useNavigate();
+  const updateSettings = useAppStore((s) => s.updateSettings);
+
+  async function acknowledge() {
+    await updateSettings({ onboarded: true });
+    navigate('/baseline');
+  }
   return (
     <div className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 px-6">
       <h1 className="text-3xl font-bold">Apnea Trainer</h1>
@@ -24,7 +31,7 @@ export function OnboardingScreen() {
           I understand and will train on dry land only.
         </label>
       </Card>
-      <Button disabled={!acked} onClick={() => navigate('/baseline')}>Continue</Button>
+      <Button disabled={!acked} onClick={acknowledge}>Continue</Button>
     </div>
   );
 }

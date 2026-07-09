@@ -14,6 +14,7 @@ export function emptyAppState(): AppState {
       vibrationCues: true,
       theme: 'ocean',
       reminderTimes: [],
+      onboarded: false,
     },
     baselines: [],
     courseState: {

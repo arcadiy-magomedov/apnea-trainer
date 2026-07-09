@@ -66,6 +66,7 @@ export interface Settings {
   vibrationCues: boolean;
   theme: 'ocean';
   reminderTimes: string[]; // 'HH:MM' 24h
+  onboarded: boolean; // true once the safety disclaimer has been acknowledged
 }
 
 export interface AppState {
