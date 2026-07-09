@@ -59,3 +59,14 @@ it('highlights the same rest-synced day that training resolves for today', async
   await waitFor(() => expect(screen.getByText(`${resolved.dayType} · today`)).toBeInTheDocument());
   expect(resolved.dayType).toBe('O2');
 });
+
+it('marks the day trained today as completed instead of jumping to the next day', async () => {
+  const trainedAt = D('2026-07-06T10:20:00'); // default microcycle day 0 = CO2
+  const state = finishSession(emptyAppState(), completed({ finishedAt: trainedAt }), trainedAt);
+
+  renderProgram(state, trainedAt); // same day as training
+
+  // The completed CO2 day is shown as done, not advanced to REST/"today".
+  await waitFor(() => expect(screen.getByText('✓ CO2 · done today')).toBeInTheDocument());
+  expect(screen.queryByText(/· today$/)).not.toBeInTheDocument();
+});

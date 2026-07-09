@@ -7,6 +7,7 @@ import { useServices } from '../app/services';
 import { useAppStore } from '../app/stores';
 import { personalBestSec, weeklySessionCount, currentStreakDays } from '../../application/stats';
 import { startTodaySession } from '../../application/usecases/startTodaySession';
+import { isSameCalendarDay } from '../../domain/apnea/time';
 
 export function HomeScreen() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export function HomeScreen() {
   const state = useAppStore((s) => s.state);
   const now = clock.now();
   const today = startTodaySession(state, now);
+  const doneToday = [...state.sessions].reverse().find((s) => isSameCalendarDay(s.finishedAt, now));
 
   function launch() {
     navigate('/runner', { state: { plan: today.plan, difficultyLevel: today.appliedDifficulty } });
@@ -38,26 +40,41 @@ export function HomeScreen() {
         <StatCard label="Streak" value={`${currentStreakDays(state, now)}d`} />
       </div>
 
-      <Card>
-        <div className="text-xs uppercase tracking-wider text-[color:var(--text-mute)]">Today</div>
-        <div className="mt-1 text-lg font-semibold">{todayTitle}</div>
-        {today.decision.reason && (
-          <div className="text-sm text-[color:var(--text-dim)]">{today.decision.reason}</div>
-        )}
-        {today.decision.deload && (
-          <div className="mt-1 text-sm text-[color:var(--warn)]">Eased after time off.</div>
-        )}
-        {today.decision.suggestRetest && (
-          <div className="mt-1 text-sm text-[color:var(--warn)]">Consider retesting your baseline.</div>
-        )}
-      </Card>
-
-      {today.needsBaseline ? (
-        <Button onClick={() => navigate('/baseline')}>Measure baseline</Button>
-      ) : today.decision.blocked ? (
-        <Button variant="ghost" disabled={!today.plan} onClick={launch}>Train anyway</Button>
+      {doneToday ? (
+        <>
+          <Card className="border-[color:var(--success)]">
+            <div className="text-xs uppercase tracking-wider text-[color:var(--text-mute)]">Today</div>
+            <div className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--success)]">
+              <span aria-hidden>✓</span> {doneToday.type} session · done
+            </div>
+            <div className="text-sm text-[color:var(--text-dim)]">Nice work. Your next session is tomorrow.</div>
+          </Card>
+          <Button variant="ghost" onClick={() => navigate('/stats')}>View stats</Button>
+        </>
       ) : (
-        <Button disabled={!today.plan} onClick={launch}>Start {today.decision.dayType} session</Button>
+        <>
+          <Card>
+            <div className="text-xs uppercase tracking-wider text-[color:var(--text-mute)]">Today</div>
+            <div className="mt-1 text-lg font-semibold">{todayTitle}</div>
+            {today.decision.reason && (
+              <div className="text-sm text-[color:var(--text-dim)]">{today.decision.reason}</div>
+            )}
+            {today.decision.deload && (
+              <div className="mt-1 text-sm text-[color:var(--warn)]">Eased after time off.</div>
+            )}
+            {today.decision.suggestRetest && (
+              <div className="mt-1 text-sm text-[color:var(--warn)]">Consider retesting your baseline.</div>
+            )}
+          </Card>
+
+          {today.needsBaseline ? (
+            <Button onClick={() => navigate('/baseline')}>Measure baseline</Button>
+          ) : today.decision.blocked ? (
+            <Button variant="ghost" disabled={!today.plan} onClick={launch}>Train anyway</Button>
+          ) : (
+            <Button disabled={!today.plan} onClick={launch}>Start {today.decision.dayType} session</Button>
+          )}
+        </>
       )}
     </div>
   );

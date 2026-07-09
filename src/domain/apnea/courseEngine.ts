@@ -57,3 +57,7 @@ export function completeSession(c: CourseState, now: number): CourseState {
     lastAdvanceAt: startOfDay(now),
   };
 }
+
+export function trainedToday(c: CourseState, now: number): boolean {
+  return c.lastTrainedAt !== null && isSameCalendarDay(c.lastTrainedAt, now);
+}

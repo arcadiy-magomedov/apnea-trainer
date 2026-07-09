@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { syncRestDays, resolveToday, completeSession, needsRecalibration } from './courseEngine';
+import { syncRestDays, resolveToday, completeSession, needsRecalibration, trainedToday } from './courseEngine';
 import { emptyAppState } from '../models/appState';
 import type { CourseState } from '../models/types';
 
@@ -54,5 +54,12 @@ describe('courseEngine', () => {
   it('needsRecalibration is true after the recalibration window', () => {
     expect(needsRecalibration(course({ lastMaxTestAt: D('2026-06-20T00:00:00') }), D('2026-07-09T00:00:00'))).toBe(true);
     expect(needsRecalibration(course({ lastMaxTestAt: D('2026-07-05T00:00:00') }), D('2026-07-09T00:00:00'))).toBe(false);
+  });
+
+  it('trainedToday is true only on the same calendar day as the last training', () => {
+    const c = course({ lastTrainedAt: D('2026-07-09T10:00:00') });
+    expect(trainedToday(c, D('2026-07-09T23:00:00'))).toBe(true);
+    expect(trainedToday(c, D('2026-07-10T01:00:00'))).toBe(false);
+    expect(trainedToday(course({ lastTrainedAt: null }), D('2026-07-09T10:00:00'))).toBe(false);
   });
 });
