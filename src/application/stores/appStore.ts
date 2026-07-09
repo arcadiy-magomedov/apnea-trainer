@@ -13,6 +13,7 @@ export interface AppStore {
   completeSession(session: Session): Promise<void>;
   recordBaseline(attempts: number[], firstContraction: number | null): Promise<void>;
   updateSettings(patch: Partial<Settings>): Promise<void>;
+  replaceState(state: AppState): Promise<void>;
 }
 
 export function createAppStore(repo: StateRepository, now: () => number) {
@@ -36,6 +37,9 @@ export function createAppStore(repo: StateRepository, now: () => number) {
       },
       async updateSettings(patch) {
         await commit(saveSettings(get().state, patch));
+      },
+      async replaceState(next) {
+        await commit(next);
       },
     };
   });

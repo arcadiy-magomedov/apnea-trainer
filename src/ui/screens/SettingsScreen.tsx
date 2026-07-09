@@ -7,6 +7,7 @@ export function SettingsScreen() {
   const hydrated = useAppStore((s) => s.hydrated);
   const state = useAppStore((s) => s.state);
   const update = useAppStore((s) => s.updateSettings);
+  const replaceState = useAppStore((s) => s.replaceState);
   const { settings } = state;
 
   const toggle = (key: 'voiceCues' | 'beepCues' | 'vibrationCues', label: string) => (
@@ -52,7 +53,7 @@ export function SettingsScreen() {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 const restored = importJson(await file.text());
-                await update(restored.settings); // persists settings; full-state import handled by repository seed in M4 hardening
+                await replaceState(restored);
               }}
             />
           </label>
