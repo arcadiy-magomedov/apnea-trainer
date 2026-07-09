@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { SessionPlan } from '../../domain/models/types';
 import { ProgressRing } from '../design-system/ProgressRing';
@@ -16,9 +16,12 @@ export function RunnerScreen() {
   const location = useLocation();
   const nav = location.state as RunnerNavState | null;
   const { wakeLock, cues } = useServices();
-  const runner = useRunnerStore((s) => s);
+  const start = useRunnerStore((s) => s.start);
+  const recordRound = useRunnerStore((s) => s.recordRound);
+  const finish = useRunnerStore((s) => s.finish);
   const complete = useAppStore((s) => s.completeSession);
   const [contractions, setContractions] = useState(0);
+  const hasFinished = useRef(false);
 
   const plan = nav?.plan ?? { type: 'CO2', rounds: [] };
   const timer = useSessionTimer(plan, {
@@ -27,26 +30,34 @@ export function RunnerScreen() {
 
   useEffect(() => {
     wakeLock.acquire();
-    runner.start(plan, nav?.difficultyLevel ?? 0);
+    start(plan, nav?.difficultyLevel ?? 0);
     timer.begin();
     return () => { wakeLock.release(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (timer.phase !== 'done' || hasFinished.current) return;
+    hasFinished.current = true;
+    void (async () => {
+      const session = finish('normal');
+      await complete(session);
+      navigate('/summary', { state: { session } });
+    })();
+  }, [complete, finish, navigate, timer.phase]);
+
   function tapOut() {
-    runner.recordRound(0, contractions, true);
+    recordRound(0, contractions, true);
     setContractions(0);
     timer.endHold();
   }
   function endHold() {
-    runner.recordRound(plan.rounds[timer.roundIndex].targetHoldSec, contractions, false);
+    recordRound(plan.rounds[timer.roundIndex].targetHoldSec, contractions, false);
     setContractions(0);
     timer.endHold();
   }
 
   if (timer.phase === 'done') {
-    const session = runner.finish('normal');
-    complete(session).then(() => navigate('/summary', { state: { session } }));
     return <p className="p-6">Saving…</p>;
   }
 
