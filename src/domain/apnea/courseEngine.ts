@@ -54,7 +54,10 @@ export function completeSession(c: CourseState, now: number): CourseState {
     ...c,
     position: c.position + 1,
     lastTrainedAt: now,
-    lastAdvanceAt: startOfDay(now),
+    // Anchor the next slot to tomorrow so a REST slot we advance into occupies
+    // its own calendar day (it is consumed the day *after* it becomes current),
+    // matching the microcycle the Program screen shows.
+    lastAdvanceAt: startOfDay(now) + DAY_MS,
   };
 }
 

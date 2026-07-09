@@ -57,7 +57,8 @@ it('highlights the same rest-synced day that training resolves for today', async
   renderProgram(state, nextDay);
 
   await waitFor(() => expect(screen.getByText(`${resolved.dayType} · today`)).toBeInTheDocument());
-  expect(resolved.dayType).toBe('O2');
+  // The day after CO2 in the default microcycle is a rest day.
+  expect(resolved.dayType).toBe('REST');
 });
 
 it('marks the day trained today as completed instead of jumping to the next day', async () => {

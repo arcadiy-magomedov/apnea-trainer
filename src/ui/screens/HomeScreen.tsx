@@ -7,7 +7,9 @@ import { useServices } from '../app/services';
 import { useAppStore } from '../app/stores';
 import { personalBestSec, weeklySessionCount, currentStreakDays } from '../../application/stats';
 import { startTodaySession } from '../../application/usecases/startTodaySession';
+import { resolveToday } from '../../domain/apnea/courseEngine';
 import { isSameCalendarDay } from '../../domain/apnea/time';
+import { DAY_MS } from '../../domain/apnea/config';
 
 export function HomeScreen() {
   const navigate = useNavigate();
@@ -16,6 +18,10 @@ export function HomeScreen() {
   const now = clock.now();
   const today = startTodaySession(state, now);
   const doneToday = [...state.sessions].reverse().find((s) => isSameCalendarDay(s.finishedAt, now));
+  const tomorrow = resolveToday(state.courseState, now + DAY_MS);
+  const doneSubtitle = tomorrow.dayType === 'REST'
+    ? 'Nice work. Tomorrow is a rest day — recover.'
+    : `Nice work. Next session tomorrow: ${tomorrow.dayType}.`;
 
   function launch() {
     navigate('/runner', { state: { plan: today.plan, difficultyLevel: today.appliedDifficulty } });
@@ -47,7 +53,7 @@ export function HomeScreen() {
             <div className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--success)]">
               <span aria-hidden>✓</span> {doneToday.type} session · done
             </div>
-            <div className="text-sm text-[color:var(--text-dim)]">Nice work. Your next session is tomorrow.</div>
+            <div className="text-sm text-[color:var(--text-dim)]">{doneSubtitle}</div>
           </Card>
           <Button variant="ghost" onClick={() => navigate('/stats')}>View stats</Button>
         </>

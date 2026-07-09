@@ -50,13 +50,15 @@ it('shows the personal-best stat card', async () => {
   await waitFor(() => expect(screen.getByText(/personal best/i)).toBeInTheDocument());
 });
 
-it('shows a completed check for the session finished today (not "Rest day")', async () => {
+it('shows a completed check for the session finished today, and that tomorrow is a rest day', async () => {
   const now = D('2026-07-06T18:00:00');
   const state = finishSession(emptyAppState(), completedSession(D('2026-07-06T10:20:00')), D('2026-07-06T10:20:00'));
 
   renderHome(state, now);
 
+  // Today's completed CO2 is shown as done — not as "Rest day" as today's title.
   await waitFor(() => expect(screen.getByText(/CO2 session · done/i)).toBeInTheDocument());
-  expect(screen.queryByText(/rest day/i)).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /start .* session/i })).not.toBeInTheDocument();
+  // The default microcycle puts a rest day after CO2, and the copy reflects it.
+  expect(screen.getByText(/tomorrow is a rest day/i)).toBeInTheDocument();
 });

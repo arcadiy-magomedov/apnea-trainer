@@ -56,17 +56,21 @@ describe('finishSession', () => {
     expect(next.courseState.lastMaxTestAt).toBe(now);
   });
 
-  it('keeps the default training sequence balanced when training once per calendar day', () => {
+  it('keeps the default training sequence balanced, resting on rest days', () => {
     let s = emptyAppState();
-    const firstTrainingAt = D('2026-07-06T10:00:00');
-    const prescribed: SessionType[] = [];
+    const firstDay = D('2026-07-06T10:00:00');
+    const cadence: string[] = [];
+    const trainingTypes: SessionType[] = [];
 
-    for (let day = 0; day < 8; day += 1) {
-      const now = firstTrainingAt + day * DAY_MS;
+    for (let day = 0; day < 14; day += 1) {
+      const now = firstDay + day * DAY_MS;
       const today = resolveToday(s.courseState, now);
-      expect(today.blocked).toBe(false);
-      expect(today.dayType).not.toBe('REST');
-      prescribed.push(today.dayType as SessionType);
+      if (today.dayType === 'REST' || today.blocked) {
+        cadence.push('REST');
+        continue; // rest days are not trainable
+      }
+      cadence.push(today.dayType);
+      trainingTypes.push(today.dayType as SessionType);
       s = finishSession(
         s,
         completed({
@@ -79,8 +83,9 @@ describe('finishSession', () => {
       );
     }
 
-    expect(prescribed).toEqual(['CO2', 'O2', 'CO2', 'O2', 'CO2', 'O2', 'CO2', 'O2']);
-    expect(prescribed.filter((d) => d === 'CO2')).toHaveLength(4);
-    expect(prescribed.filter((d) => d === 'O2')).toHaveLength(4);
+    // Rest days genuinely occupy calendar days (matching the microcycle).
+    expect(cadence.slice(0, 7)).toEqual(['CO2', 'REST', 'O2', 'REST', 'CO2', 'O2', 'REST']);
+    // Training days alternate CO2/O2 without back-to-back duplicates from skipped rests.
+    expect(trainingTypes.slice(0, 4)).toEqual(['CO2', 'O2', 'CO2', 'O2']);
   });
 });

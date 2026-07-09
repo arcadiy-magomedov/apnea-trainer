@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { syncRestDays, resolveToday, completeSession, needsRecalibration, trainedToday } from './courseEngine';
 import { emptyAppState } from '../models/appState';
+import { DAY_MS } from './config';
 import type { CourseState } from '../models/types';
 
 const D = (iso: string) => new Date(iso).getTime();
@@ -61,5 +62,15 @@ describe('courseEngine', () => {
     expect(trainedToday(c, D('2026-07-09T23:00:00'))).toBe(true);
     expect(trainedToday(c, D('2026-07-10T01:00:00'))).toBe(false);
     expect(trainedToday(course({ lastTrainedAt: null }), D('2026-07-09T10:00:00'))).toBe(false);
+  });
+
+  it('a REST slot entered by completing training occupies its own calendar day', () => {
+    // Default microcycle: position 0 = CO2, position 1 = REST.
+    const trainedAt = D('2026-07-06T10:00:00');
+    const c = completeSession(course({ position: 0 }), trainedAt); // now at REST (position 1)
+    // The day after training is the rest day itself, not the following training slot.
+    expect(resolveToday(c, trainedAt + DAY_MS).dayType).toBe('REST');
+    // Two days after training, the rest day has been served and O2 becomes current.
+    expect(resolveToday(c, trainedAt + 2 * DAY_MS).dayType).toBe('O2');
   });
 });
