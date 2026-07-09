@@ -8,6 +8,7 @@ import type { StateRepository } from '../../domain/ports/stateRepository';
 import { systemClock } from '../../infrastructure/device/systemClock';
 import { noopWakeLock, noopCues, noopNotifications } from '../../infrastructure/device/noopServices';
 import { createIndexedDbRepository } from '../../infrastructure/persistence/indexedDbRepository';
+import { buildIcs } from '../../infrastructure/notifications/icsExporter';
 
 export interface Services {
   clock: Clock;
@@ -24,7 +25,7 @@ function defaultServices(): Services {
     wakeLock: noopWakeLock,
     cues: noopCues,
     notifications: noopNotifications,
-    ics: { build: () => '' },
+    ics: { build: buildIcs },
     repository: createIndexedDbRepository(),
   };
 }
