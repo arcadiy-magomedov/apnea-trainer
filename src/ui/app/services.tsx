@@ -5,10 +5,7 @@ import type { CueService } from '../../domain/ports/cueService';
 import type { NotificationService } from '../../domain/ports/notificationService';
 import type { IcsExporter } from '../../domain/ports/icsExporter';
 import type { StateRepository } from '../../domain/ports/stateRepository';
-import { systemClock } from '../../infrastructure/device/systemClock';
-import { noopWakeLock, noopCues, noopNotifications } from '../../infrastructure/device/noopServices';
-import { createIndexedDbRepository } from '../../infrastructure/persistence/indexedDbRepository';
-import { buildIcs } from '../../infrastructure/notifications/icsExporter';
+import { productionServices } from '../../infrastructure/device/productionServices';
 
 export interface Services {
   clock: Clock;
@@ -20,14 +17,7 @@ export interface Services {
 }
 
 function defaultServices(): Services {
-  return {
-    clock: systemClock,
-    wakeLock: noopWakeLock,
-    cues: noopCues,
-    notifications: noopNotifications,
-    ics: { build: buildIcs },
-    repository: createIndexedDbRepository(),
-  };
+  return productionServices();
 }
 
 const ServicesContext = createContext<Services | null>(null);
