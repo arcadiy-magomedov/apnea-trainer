@@ -8,6 +8,7 @@ import { formatMMSS } from '../design-system/format';
 import { useSessionTimer } from '../hooks/useSessionTimer';
 import { useServices } from '../app/services';
 import { useAppStore, useRunnerStore } from '../app/stores';
+import { useCues } from '../hooks/useCues';
 
 interface RunnerNavState { plan: SessionPlan; difficultyLevel: number; }
 
@@ -15,7 +16,8 @@ export function RunnerScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = location.state as RunnerNavState | null;
-  const { clock, wakeLock, cues } = useServices();
+  const { clock, wakeLock } = useServices();
+  const cue = useCues();
   const start = useRunnerStore((s) => s.start);
   const recordRound = useRunnerStore((s) => s.recordRound);
   const finish = useRunnerStore((s) => s.finish);
@@ -26,7 +28,7 @@ export function RunnerScreen() {
 
   const plan = nav?.plan ?? { type: 'CO2', rounds: [] };
   const timer = useSessionTimer(plan, {
-    onPhaseChange: (p) => { cues.speak(p); cues.beep(); },
+    onPhaseChange: (p) => cue.phaseCue(p),
   });
 
   useEffect(() => {
