@@ -14,3 +14,25 @@ export function generateCo2Table(maxHoldSec: number, difficultyLevel: number): S
   }
   return { type: 'CO2', rounds };
 }
+
+export function generateO2Table(maxHoldSec: number, difficultyLevel: number): SessionPlan {
+  const o = APNEA_DEFAULTS.o2;
+  const endPct = APNEA_DEFAULTS.o2SafetyCapPct;
+  const startPct = Math.min(
+    endPct - 0.05,
+    o.holdStartPct + difficultyLevel * APNEA_DEFAULTS.difficulty.o2StartPctPerLevel,
+  );
+  const rounds: RoundPlan[] = [];
+  for (let i = 0; i < o.rounds; i++) {
+    const pct = startPct + (endPct - startPct) * (i / (o.rounds - 1));
+    rounds.push({
+      index: i,
+      targetHoldSec: Math.min(
+        Math.round(maxHoldSec * endPct),
+        Math.round(maxHoldSec * pct),
+      ),
+      restBeforeSec: i === 0 ? 0 : o.restSec,
+    });
+  }
+  return { type: 'O2', rounds };
+}
