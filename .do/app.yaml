@@ -5,7 +5,7 @@ static_sites:
     github:
       repo: arcadiy-magomedov/apnea-trainer
       branch: main
-      deploy_on_push: false   # deploys are triggered by the CI workflow after tests pass
+      deploy_on_push: true   # App Platform autodeploys on push to main
     build_command: npm ci && npm run build
     output_dir: dist
     environment_slug: node-js
