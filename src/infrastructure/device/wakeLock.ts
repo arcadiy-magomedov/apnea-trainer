@@ -21,7 +21,7 @@ export function createWakeLock(
       sentinel = await (nav as WakeLockNavigator).wakeLock!.request!('screen');
       return;
     }
-    noSleep = makeNoSleep();
+    noSleep ??= makeNoSleep();
     noSleep.enable();
   }
 

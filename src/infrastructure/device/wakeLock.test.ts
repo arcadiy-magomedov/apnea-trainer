@@ -23,4 +23,20 @@ describe('createWakeLock', () => {
     await wl.release();
     expect(disable).toHaveBeenCalled();
   });
+
+  it('does not leak a previously-enabled NoSleep fallback on re-acquire', async () => {
+    const instances: Array<{ enable: ReturnType<typeof vi.fn>; disable: ReturnType<typeof vi.fn> }> = [];
+    const nav = {} as Navigator;
+    const wl = createWakeLock(nav, () => {
+      const instance = { enable: vi.fn(), disable: vi.fn() };
+      instances.push(instance);
+      return instance;
+    });
+
+    await wl.acquire();
+    await wl.acquire();
+
+    const priorInstances = instances.slice(0, -1);
+    expect(instances.length === 1 || priorInstances.every((instance) => instance.disable.mock.calls.length > 0)).toBe(true);
+  });
 });
