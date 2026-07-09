@@ -11,4 +11,12 @@ describe('design tokens', () => {
       expect(css).toContain(token);
     }
   });
+
+  it('wires the Tailwind color config so custom color utilities are generated', () => {
+    // Tailwind v4 does not auto-load tailwind.config.ts; index.css must @config it,
+    // otherwise utilities like bg-cyan/bg-surface/bg-danger are never emitted and
+    // button backgrounds silently disappear.
+    const indexCss = readFileSync('src/index.css', 'utf-8');
+    expect(indexCss).toMatch(/@config\s+['"].*tailwind\.config\.ts['"]/);
+  });
 });

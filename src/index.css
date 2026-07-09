@@ -1,5 +1,6 @@
 @import './ui/design-system/tokens.css';
 @import 'tailwindcss';
+@config '../tailwind.config.ts';
 
 html, body, #root { height: 100%; }
 body {
