@@ -1,0 +1,16 @@
+:root {
+  --ocean-900: #05121c;
+  --ocean-700: #0d2839;
+  --surface: #102f43;
+  --surface-2: #143a52;
+  --border: #1f4a63;
+  --text: #e8f6fb;
+  --text-dim: #8fb6c8;
+  --text-mute: #5d8298;
+  --cyan: #22d3ee;
+  --cyan-deep: #0891b2;
+  --teal: #2dd4bf;
+  --success: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
+}
