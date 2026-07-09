@@ -19,14 +19,16 @@ export function RunnerScreen() {
   const { clock, wakeLock } = useServices();
   const cue = useCues();
   const start = useRunnerStore((s) => s.start);
+  const storePlan = useRunnerStore((s) => s.plan);
   const recordRound = useRunnerStore((s) => s.recordRound);
   const finish = useRunnerStore((s) => s.finish);
   const complete = useAppStore((s) => s.completeSession);
   const [contractions, setContractions] = useState(0);
+  const [pendingRecoverAdvance, setPendingRecoverAdvance] = useState(false);
   const holdStartedAt = useRef<number | null>(null);
   const hasFinished = useRef(false);
 
-  const plan = nav?.plan ?? { type: 'CO2', rounds: [] };
+  const plan = storePlan ?? nav?.plan ?? { type: 'CO2', rounds: [] };
   const timer = useSessionTimer(plan, {
     onPhaseChange: (p) => cue.phaseCue(p),
   });
@@ -38,6 +40,12 @@ export function RunnerScreen() {
     return () => { wakeLock.release(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!pendingRecoverAdvance) return;
+    setPendingRecoverAdvance(false);
+    timer.endHold();
+  }, [pendingRecoverAdvance, timer]);
 
   useEffect(() => {
     if (timer.phase === 'hold') {
@@ -65,7 +73,7 @@ export function RunnerScreen() {
   function tapOut() {
     recordRound(achievedHoldSec(), contractions, true);
     setContractions(0);
-    timer.endHold();
+    setPendingRecoverAdvance(true);
   }
   function endHold() {
     recordRound(achievedHoldSec(), contractions, false);

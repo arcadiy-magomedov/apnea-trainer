@@ -139,3 +139,15 @@ it('records zero achieved hold when tapping out during recover before the next h
   expect(screen.getByText('1:00')).toBeInTheDocument();
   expect(screen.queryByText('1:30')).not.toBeInTheDocument();
 });
+
+it('uses the eased recover duration after tapping out a hold', async () => {
+  vi.useFakeTimers();
+  renderRunner({ plan: twoRoundPlan });
+
+  await advanceToHold();
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /i tapped out/i })); });
+
+  expect(screen.getByText(/^recover$/i)).toBeInTheDocument();
+  expect(screen.getByText('1:00')).toBeInTheDocument();
+  expect(screen.queryByText('0:45')).not.toBeInTheDocument();
+});
