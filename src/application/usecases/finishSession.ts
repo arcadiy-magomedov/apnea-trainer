@@ -1,5 +1,5 @@
 import type { AppState, Session, Baseline } from '../../domain/models/types';
-import { completeSession } from '../../domain/apnea/courseEngine';
+import { completeSession, syncRestDays } from '../../domain/apnea/courseEngine';
 import { evaluateProgression } from '../../domain/apnea/adaptationEngine';
 
 function applyProgression(difficulty: number, action: 'progress' | 'repeat' | 'deload'): number {
@@ -10,7 +10,7 @@ function applyProgression(difficulty: number, action: 'progress' | 'repeat' | 'd
 
 export function finishSession(state: AppState, session: Session, now: number): AppState {
   const sessions = [...state.sessions, session];
-  let courseState = completeSession(state.courseState, now);
+  let courseState = completeSession(syncRestDays(state.courseState, now), now);
   let baselines = state.baselines;
 
   if (session.type === 'MAX') {

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { finishSession } from './finishSession';
 import { emptyAppState } from '../../domain/models/appState';
-import type { Session } from '../../domain/models/types';
+import { DAY_MS } from '../../domain/apnea/config';
+import { resolveToday } from '../../domain/apnea/courseEngine';
+import type { Session, SessionType } from '../../domain/models/types';
 
 const D = (iso: string) => new Date(iso).getTime();
 function completed(over: Partial<Session> = {}): Session {
@@ -52,5 +54,33 @@ describe('finishSession', () => {
     const next = finishSession(s, maxSess, now);
     expect(next.baselines.at(-1)?.maxHoldSec).toBe(222);
     expect(next.courseState.lastMaxTestAt).toBe(now);
+  });
+
+  it('keeps the default training sequence balanced when training once per calendar day', () => {
+    let s = emptyAppState();
+    const firstTrainingAt = D('2026-07-06T10:00:00');
+    const prescribed: SessionType[] = [];
+
+    for (let day = 0; day < 8; day += 1) {
+      const now = firstTrainingAt + day * DAY_MS;
+      const today = resolveToday(s.courseState, now);
+      expect(today.blocked).toBe(false);
+      expect(today.dayType).not.toBe('REST');
+      prescribed.push(today.dayType as SessionType);
+      s = finishSession(
+        s,
+        completed({
+          id: `daily-${day}`,
+          type: today.dayType as SessionType,
+          startedAt: now,
+          finishedAt: now + 20 * 60 * 1000,
+        }),
+        now + 20 * 60 * 1000,
+      );
+    }
+
+    expect(prescribed).toEqual(['CO2', 'O2', 'CO2', 'O2', 'CO2', 'O2', 'CO2', 'O2']);
+    expect(prescribed.filter((d) => d === 'CO2')).toHaveLength(4);
+    expect(prescribed.filter((d) => d === 'O2')).toHaveLength(4);
   });
 });

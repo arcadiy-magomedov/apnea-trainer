@@ -2,12 +2,13 @@ import { Card } from '../design-system/Card';
 import { Button } from '../design-system/Button';
 import { useServices } from '../app/services';
 import { useAppStore } from '../app/stores';
+import { syncRestDays } from '../../domain/apnea/courseEngine';
 
 export function ProgramScreen() {
   const { clock, ics } = useServices();
   const state = useAppStore((s) => s.state);
   const days = state.courseState.template.days;
-  const position = state.courseState.position % days.length;
+  const position = syncRestDays(state.courseState, clock.now()).position % days.length;
 
   function exportIcs() {
     const content = ics.build(state.settings.reminderTimes, state.courseState.template, clock.now());
