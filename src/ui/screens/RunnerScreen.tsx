@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { SessionPlan } from '../../domain/models/types';
 import { ProgressRing } from '../design-system/ProgressRing';
 import { PhaseBadge, PHASE_COLOR } from '../design-system/PhaseBadge';
@@ -11,6 +11,8 @@ import { useAppStore, useRunnerStore } from '../app/stores';
 import { useCues } from '../hooks/useCues';
 
 interface RunnerNavState { plan: SessionPlan; difficultyLevel: number; }
+
+const EMPTY_PLAN: SessionPlan = { type: 'CO2', rounds: [] };
 
 export function RunnerScreen() {
   const navigate = useNavigate();
@@ -28,14 +30,17 @@ export function RunnerScreen() {
   const holdStartedAt = useRef<number | null>(null);
   const hasFinished = useRef(false);
 
-  const plan = storePlan ?? nav?.plan ?? { type: 'CO2', rounds: [] };
+  const navPlan = nav?.plan;
+  const hasUsablePlan = !!navPlan && navPlan.rounds.length > 0;
+  const plan = storePlan ?? navPlan ?? EMPTY_PLAN;
   const timer = useSessionTimer(plan, {
     onPhaseChange: (p) => cue.phaseCue(p),
   });
 
   useEffect(() => {
+    if (!hasUsablePlan || !navPlan) return;
     wakeLock.acquire();
-    start(plan, nav?.difficultyLevel ?? 0);
+    start(navPlan, nav?.difficultyLevel ?? 0);
     timer.begin();
     return () => { wakeLock.release(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,6 +84,10 @@ export function RunnerScreen() {
     recordRound(achievedHoldSec(), contractions, false);
     setContractions(0);
     timer.endHold();
+  }
+
+  if (!hasUsablePlan) {
+    return <Navigate to="/train" replace />;
   }
 
   if (timer.phase === 'done') {

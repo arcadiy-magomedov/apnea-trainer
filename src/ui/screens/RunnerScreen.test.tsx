@@ -5,6 +5,7 @@ import { ServicesProvider } from '../app/services';
 import { AppProviders } from '../app/stores';
 import { RunnerScreen } from './RunnerScreen';
 import { SummaryScreen } from './SummaryScreen';
+import { TrainScreen } from './TrainScreen';
 import { noopWakeLock } from '../../infrastructure/device/noopServices';
 import { emptyAppState } from '../../domain/models/appState';
 import type { AppState, SessionPlan } from '../../domain/models/types';
@@ -55,6 +56,26 @@ function renderRunner({
   );
 
   return { clock, repository, setState };
+}
+
+function renderRunnerWithoutNavigationState() {
+  const repository = {
+    getState: vi.fn(async () => emptyAppState()),
+    setState: vi.fn(async (_state: AppState) => {}),
+  };
+
+  render(
+    <ServicesProvider value={{ repository, wakeLock: noopWakeLock }}>
+      <AppProviders>
+        <MemoryRouter initialEntries={['/runner']}>
+          <Routes>
+            <Route path="/runner" element={<RunnerScreen />} />
+            <Route path="/train" element={<TrainScreen />} />
+          </Routes>
+        </MemoryRouter>
+      </AppProviders>
+    </ServicesProvider>,
+  );
 }
 
 async function advanceToHold() {
@@ -150,4 +171,10 @@ it('uses the eased recover duration after tapping out a hold', async () => {
   expect(screen.getByText(/^recover$/i)).toBeInTheDocument();
   expect(screen.getByText('1:00')).toBeInTheDocument();
   expect(screen.queryByText('0:45')).not.toBeInTheDocument();
+});
+
+it('redirects to train when opened without a navigation plan', async () => {
+  expect(() => renderRunnerWithoutNavigationState()).not.toThrow();
+
+  await waitFor(() => expect(screen.getByRole('heading', { name: /train/i })).toBeInTheDocument());
 });
