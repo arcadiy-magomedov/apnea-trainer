@@ -36,3 +36,22 @@ export function generateO2Table(maxHoldSec: number, difficultyLevel: number): Se
   }
   return { type: 'O2', rounds };
 }
+
+import type { DayType } from '../models/types';
+
+export function generateMaxTable(maxHoldSec: number): SessionPlan {
+  return { type: 'MAX', rounds: [{ index: 0, targetHoldSec: maxHoldSec, restBeforeSec: 0 }] };
+}
+
+export function generatePlanForDay(
+  day: DayType,
+  maxHoldSec: number,
+  difficultyLevel: number,
+): SessionPlan | null {
+  switch (day) {
+    case 'CO2': return generateCo2Table(maxHoldSec, difficultyLevel);
+    case 'O2': return generateO2Table(maxHoldSec, difficultyLevel);
+    case 'MAX': return generateMaxTable(maxHoldSec);
+    case 'REST': return null;
+  }
+}
