@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import { createAppStore } from './appStore';
 import { emptyAppState } from '../../domain/models/appState';
 import type { StateRepository } from '../../domain/ports/stateRepository';

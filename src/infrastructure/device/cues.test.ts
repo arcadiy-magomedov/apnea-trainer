@@ -4,7 +4,13 @@ import { createCues } from './cues';
 describe('createCues', () => {
   it('speaks via speechSynthesis when available', () => {
     const speak = vi.fn();
-    const win = { speechSynthesis: { speak }, SpeechSynthesisUtterance: class { constructor(public text: string) {} } } as unknown as Window;
+    const win = {
+      speechSynthesis: { speak },
+      SpeechSynthesisUtterance: class {
+        text: string;
+        constructor(text: string) { this.text = text; }
+      },
+    } as unknown as Window;
     createCues(win, {} as Navigator).speak('Hold');
     expect(speak).toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { it, expect, vi } from 'vitest';
 import { act } from '@testing-library/react';
 import { makeAppUpdate } from './useAppUpdate';
 
