@@ -1,4 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+export async function pollForUpdate(registration: ServiceWorkerRegistration | undefined): Promise<void> {
+  await registration?.update();
+}
 
 export function makeAppUpdate(updateSW: (reload?: boolean) => Promise<void>) {
   let needRefresh = false;
@@ -17,6 +21,7 @@ export function makeAppUpdate(updateSW: (reload?: boolean) => Promise<void>) {
 export function useAppUpdate(sessionActive: boolean) {
   const [needRefresh, setNeedRefresh] = useState(false);
   const [update, setUpdate] = useState<(reload?: boolean) => Promise<void>>();
+  const registrationRef = useRef<ServiceWorkerRegistration | undefined>(undefined);
 
   useEffect(() => {
     let disposed = false;
@@ -26,10 +31,12 @@ export function useAppUpdate(sessionActive: boolean) {
       const updateSW = registerSW({
         immediate: true,
         onNeedRefresh() { setNeedRefresh(true); },
+        onRegisteredSW(_swUrl, registration) { registrationRef.current = registration; },
       });
       setUpdate(() => updateSW);
-      const id = setInterval(() => { void updateSW(); }, 60 * 60 * 1000);
-      const onFocus = () => { void updateSW(); };
+      const checkForUpdate = () => { void pollForUpdate(registrationRef.current); };
+      const id = setInterval(checkForUpdate, 60 * 60 * 1000);
+      const onFocus = () => { checkForUpdate(); };
       window.addEventListener('focus', onFocus);
       cleanup = () => { clearInterval(id); window.removeEventListener('focus', onFocus); };
     });
