@@ -8,6 +8,7 @@ import { RunnerScreen } from '../screens/RunnerScreen';
 import { BaselineScreen } from '../screens/BaselineScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { ProgramScreen } from '../screens/ProgramScreen';
+import { SummaryScreen } from '../screens/SummaryScreen';
 
 export function AppRoutes() {
   return (
@@ -15,6 +16,7 @@ export function AppRoutes() {
       <Route path="/onboarding" element={<OnboardingScreen />} />
       <Route path="/baseline" element={<BaselineScreen />} />
       <Route path="/runner" element={<RunnerScreen />} />
+      <Route path="/summary" element={<AppShell><SummaryScreen /></AppShell>} />
       <Route path="/" element={<AppShell><HomeScreen /></AppShell>} />
       <Route path="/stats" element={<AppShell><StatsScreen /></AppShell>} />
       <Route path="/train" element={<AppShell><TrainScreen /></AppShell>} />
