@@ -1,0 +1,17 @@
+name: apnea-trainer
+region: fra
+static_sites:
+  - name: web
+    github:
+      repo: arcadiy-magomedov/apnea-trainer
+      branch: main
+      deploy_on_push: false   # deploys are triggered by the CI workflow after tests pass
+    build_command: npm ci && npm run build
+    output_dir: dist
+    environment_slug: node-js
+    catchall_document: index.html   # SPA fallback for client-side routing
+    index_document: index.html
+    envs:
+      - key: VITE_APP_VERSION
+        scope: BUILD_TIME
+        value: ${_self.COMMIT_HASH}
