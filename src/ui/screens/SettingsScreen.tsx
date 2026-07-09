@@ -9,6 +9,7 @@ export function SettingsScreen() {
   const update = useAppStore((s) => s.updateSettings);
   const replaceState = useAppStore((s) => s.replaceState);
   const { settings } = state;
+  const appVersion = (globalThis as { __APP_VERSION__?: string }).__APP_VERSION__ ?? __APP_VERSION__;
 
   const toggle = (key: 'voiceCues' | 'beepCues' | 'vibrationCues', label: string) => (
     <label className="flex items-center justify-between py-1 text-sm">
@@ -66,6 +67,7 @@ export function SettingsScreen() {
       </Card>
         </>
       )}
+      <p className="pt-2 text-center text-xs text-[color:var(--text-mute)]">Version {appVersion}</p>
     </div>
   );
 }
