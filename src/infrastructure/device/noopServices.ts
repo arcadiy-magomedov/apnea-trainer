@@ -11,6 +11,7 @@ export const noopCues: CueService = {
   speak() {},
   beep() {},
   vibrate() {},
+  prime() {},
 };
 
 export const noopNotifications: NotificationService = {

@@ -15,6 +15,7 @@ export function ProgressRing({
         <circle
           cx="112" cy="112" r={r} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={dashOffset(progress, r)}
+          style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">

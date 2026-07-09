@@ -59,6 +59,7 @@ export function useSessionTimer(plan: SessionPlan, opts: Options = {}) {
       toPhase('recover', plan.rounds[nextIdx].restBeforeSec);
     },
     recoverToNextHold: () => toPhase('hold', plan.rounds[roundIndex].targetHoldSec || 9999),
+    startHold: () => toPhase('hold', plan.rounds[roundIndex].targetHoldSec || 9999),
     stop: () => setActive(false),
   };
 }

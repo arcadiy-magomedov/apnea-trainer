@@ -3,7 +3,6 @@ import { AppShell } from './AppShell';
 import { useAppStore } from './stores';
 import { HomeScreen } from '../screens/HomeScreen';
 import { StatsScreen } from '../screens/StatsScreen';
-import { TrainScreen } from '../screens/TrainScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { RunnerScreen } from '../screens/RunnerScreen';
 import { BaselineScreen } from '../screens/BaselineScreen';
@@ -28,7 +27,6 @@ export function AppRoutes() {
       <Route path="/summary" element={<AppShell><SummaryScreen /></AppShell>} />
       <Route path="/" element={<HomeOrOnboarding />} />
       <Route path="/stats" element={<AppShell><StatsScreen /></AppShell>} />
-      <Route path="/train" element={<AppShell><TrainScreen /></AppShell>} />
       <Route path="/program" element={<AppShell><ProgramScreen /></AppShell>} />
       <Route path="/settings" element={<AppShell><SettingsScreen /></AppShell>} />
     </Routes>

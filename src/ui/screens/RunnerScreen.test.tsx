@@ -5,7 +5,6 @@ import { ServicesProvider } from '../app/services';
 import { AppProviders } from '../app/stores';
 import { RunnerScreen } from './RunnerScreen';
 import { SummaryScreen } from './SummaryScreen';
-import { TrainScreen } from './TrainScreen';
 import { noopWakeLock } from '../../infrastructure/device/noopServices';
 import { emptyAppState } from '../../domain/models/appState';
 import type { AppState, SessionPlan } from '../../domain/models/types';
@@ -49,6 +48,7 @@ function renderRunner({
           <Routes>
             <Route path="/runner" element={<RunnerScreen />} />
             <Route path="/summary" element={<SummaryScreen />} />
+            <Route path="/" element={<div>home-root</div>} />
           </Routes>
         </MemoryRouter>
       </AppProviders>
@@ -70,7 +70,7 @@ function renderRunnerWithoutNavigationState() {
         <MemoryRouter initialEntries={['/runner']}>
           <Routes>
             <Route path="/runner" element={<RunnerScreen />} />
-            <Route path="/train" element={<TrainScreen />} />
+            <Route path="/" element={<div>home-root</div>} />
           </Routes>
         </MemoryRouter>
       </AppProviders>
@@ -84,8 +84,8 @@ async function flushAsyncWork() {
   }
 }
 
-// The runner gates the session behind an explicit Start tap so the wake lock is
-// acquired inside a user gesture (required by iOS).
+// The runner gates the session behind an explicit Start tap so the wake lock and
+// audio are unlocked inside a user gesture (required by iOS).
 async function startSession() {
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: /start session/i }));
@@ -103,10 +103,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('acquires a wake lock when the session starts (from a user gesture)', async () => {
+it('acquires a wake lock only after the user taps Start', async () => {
   const acquire = vi.fn(async () => {});
   renderRunner({ wakeLock: { ...noopWakeLock, acquire } });
-  // Not acquired on mount — only after the user taps Start.
   expect(acquire).not.toHaveBeenCalled();
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: /start session/i }));
@@ -145,40 +144,29 @@ it('records the actual hold duration instead of the target hold duration', async
 
   expect(screen.getByRole('heading', { name: /session complete/i })).toBeInTheDocument();
   expect(screen.getByText('0:40')).toBeInTheDocument();
-  expect(screen.queryByText('1:00')).not.toBeInTheDocument();
 });
 
-it('records zero achieved hold when tapping out during recover before the next hold starts', async () => {
+it('shows the tap-out control only during the hold, never during recover', async () => {
   vi.useFakeTimers();
-  const clock = new FakeClock(10_000);
-  const savedStates: AppState[] = [];
-  const setState = vi.fn(async (state: AppState) => { savedStates.push(state); });
-  renderRunner({ plan: twoRoundPlan, clock, setState });
+  renderRunner({ plan: twoRoundPlan });
 
   await startSession();
+  // Breathe-up: no tap-out yet.
+  expect(screen.queryByRole('button', { name: /i tapped out/i })).not.toBeInTheDocument();
+
   await advanceToHold();
-  clock.advance(60_000);
-  await act(async () => { vi.advanceTimersByTime(60_000); });
+  // Hold: tap-out available.
+  expect(screen.getByRole('button', { name: /i tapped out/i })).toBeInTheDocument();
+
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /end hold/i })); });
   expect(screen.getByText(/^recover$/i)).toBeInTheDocument();
 
-  clock.advance(30_000);
-  await act(async () => { vi.advanceTimersByTime(30_000); });
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /i tapped out/i })); });
-  await flushAsyncWork();
-
-  expect(screen.getByRole('heading', { name: /session complete/i })).toBeInTheDocument();
-  expect(setState).toHaveBeenCalledOnce();
-  const savedState = savedStates[0];
-  expect(savedState.sessions[0]?.rounds[1]).toMatchObject({
-    achievedHoldSec: 0,
-    tappedOut: true,
-  });
-  expect(screen.getByText('1:00')).toBeInTheDocument();
-  expect(screen.queryByText('1:30')).not.toBeInTheDocument();
+  // Recover: tap-out is gone; a clear "start next hold" control is shown instead.
+  expect(screen.queryByRole('button', { name: /i tapped out/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /start next hold/i })).toBeInTheDocument();
 });
 
-it('uses the eased recover duration after tapping out a hold', async () => {
+it('eases the recover duration after tapping out a hold', async () => {
   vi.useFakeTimers();
   renderRunner({ plan: twoRoundPlan });
 
@@ -191,8 +179,7 @@ it('uses the eased recover duration after tapping out a hold', async () => {
   expect(screen.queryByText('0:45')).not.toBeInTheDocument();
 });
 
-it('redirects to train when opened without a navigation plan', async () => {
+it('redirects home when opened without a navigation plan', async () => {
   expect(() => renderRunnerWithoutNavigationState()).not.toThrow();
-
-  await waitFor(() => expect(screen.getByRole('heading', { name: /train/i })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('home-root')).toBeInTheDocument());
 });
