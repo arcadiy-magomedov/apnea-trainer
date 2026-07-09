@@ -7,7 +7,7 @@ import { RunnerScreen } from './RunnerScreen';
 import { SummaryScreen } from './SummaryScreen';
 import { noopWakeLock } from '../../infrastructure/device/noopServices';
 import { emptyAppState } from '../../domain/models/appState';
-import type { SessionPlan } from '../../domain/models/types';
+import type { AppState, SessionPlan } from '../../domain/models/types';
 import { FakeClock } from '../../test/fakeClock';
 
 const shortPlan: SessionPlan = {
@@ -15,12 +15,27 @@ const shortPlan: SessionPlan = {
   rounds: [{ index: 0, targetHoldSec: 60, restBeforeSec: 0 }],
 };
 
+const twoRoundPlan: SessionPlan = {
+  type: 'CO2',
+  rounds: [
+    { index: 0, targetHoldSec: 60, restBeforeSec: 0 },
+    { index: 1, targetHoldSec: 60, restBeforeSec: 45 },
+  ],
+};
+
+interface RenderRunnerOptions {
+  plan?: SessionPlan;
+  clock?: FakeClock;
+  setState?: (state: AppState) => Promise<void>;
+  wakeLock?: typeof noopWakeLock;
+}
+
 function renderRunner({
   plan = shortPlan,
   clock = new FakeClock(1_000),
-  setState = vi.fn(async () => {}),
+  setState = vi.fn(async (_state: AppState) => {}),
   wakeLock = noopWakeLock,
-} = {}) {
+}: RenderRunnerOptions = {}) {
   const repository = {
     getState: vi.fn(async () => emptyAppState()),
     setState,
@@ -94,4 +109,33 @@ it('records the actual hold duration instead of the target hold duration', async
   expect(screen.getByRole('heading', { name: /session complete/i })).toBeInTheDocument();
   expect(screen.getByText('0:40')).toBeInTheDocument();
   expect(screen.queryByText('1:00')).not.toBeInTheDocument();
+});
+
+it('records zero achieved hold when tapping out during recover before the next hold starts', async () => {
+  vi.useFakeTimers();
+  const clock = new FakeClock(10_000);
+  const savedStates: AppState[] = [];
+  const setState = vi.fn(async (state: AppState) => { savedStates.push(state); });
+  renderRunner({ plan: twoRoundPlan, clock, setState });
+
+  await advanceToHold();
+  clock.advance(60_000);
+  await act(async () => { vi.advanceTimersByTime(60_000); });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /end hold/i })); });
+  expect(screen.getByText(/^recover$/i)).toBeInTheDocument();
+
+  clock.advance(30_000);
+  await act(async () => { vi.advanceTimersByTime(30_000); });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /i tapped out/i })); });
+  await flushAsyncWork();
+
+  expect(screen.getByRole('heading', { name: /session complete/i })).toBeInTheDocument();
+  expect(setState).toHaveBeenCalledOnce();
+  const savedState = savedStates[0];
+  expect(savedState.sessions[0]?.rounds[1]).toMatchObject({
+    achievedHoldSec: 0,
+    tappedOut: true,
+  });
+  expect(screen.getByText('1:00')).toBeInTheDocument();
+  expect(screen.queryByText('1:30')).not.toBeInTheDocument();
 });

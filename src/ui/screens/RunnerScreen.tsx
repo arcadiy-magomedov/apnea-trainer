@@ -38,7 +38,11 @@ export function RunnerScreen() {
   }, []);
 
   useEffect(() => {
-    if (timer.phase === 'hold') holdStartedAt.current = clock.now();
+    if (timer.phase === 'hold') {
+      holdStartedAt.current = clock.now();
+      return;
+    }
+    holdStartedAt.current = null;
   }, [clock, timer.phase, timer.roundIndex]);
 
   useEffect(() => {
