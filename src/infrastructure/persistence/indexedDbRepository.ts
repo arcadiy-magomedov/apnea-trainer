@@ -2,6 +2,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import type { StateRepository } from '../../domain/ports/stateRepository';
 import type { AppState } from '../../domain/models/types';
 import { emptyAppState } from '../../domain/models/appState';
+import { migrateAppState } from '../../domain/models/migrateAppState';
 
 const DB_NAME = 'apnea-trainer';
 const STORE = 'app';
@@ -22,8 +23,11 @@ export function createIndexedDbRepository(): StateRepository {
     async getState(): Promise<AppState> {
       const database = await db();
       try {
-        const stored = (await database.get(STORE, KEY)) as AppState | undefined;
-        return stored ?? emptyAppState();
+        const stored = await database.get(STORE, KEY);
+        if (stored === undefined) {
+          return emptyAppState();
+        }
+        return migrateAppState(stored);
       } finally {
         database.close();
       }

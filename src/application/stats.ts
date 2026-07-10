@@ -1,14 +1,18 @@
-import type { AppState } from '../domain/models/types';
+import type {
+  AppState,
+  SessionQuality,
+  TrainingSessionType,
+} from '../domain/models/types';
 import { DAY_MS } from '../domain/apnea/config';
+import { bestAssessedMaxSec } from '../domain/apnea/assessmentHistory';
+import {
+  classifySession,
+  medianContractionOnsetRatio,
+} from '../domain/apnea/qualityEngine';
 import { startOfDay, isSameCalendarDay } from '../domain/apnea/time';
 
 export function personalBestSec(state: AppState): number {
-  const baselineMax = state.baselines.reduce((m, b) => Math.max(m, b.maxHoldSec), 0);
-  const sessionMax = state.sessions.reduce((m, s) => {
-    const best = s.rounds.reduce((rm, r) => Math.max(rm, r.achievedHoldSec), 0);
-    return Math.max(m, best);
-  }, 0);
-  return Math.max(baselineMax, sessionMax);
+  return bestAssessedMaxSec(state);
 }
 
 export function weeklySessionCount(state: AppState, now: number): number {
@@ -38,6 +42,23 @@ export function adherencePct(state: AppState, now: number, windowDays = 28): num
   const cutoff = now - windowDays * DAY_MS;
   const done = state.sessions.filter((s) => s.finishedAt >= cutoff).length;
   return Math.min(100, Math.round((done / expected) * 100));
+}
+
+export function latestSessionQuality(state: AppState): SessionQuality | null {
+  const sessions = state.sessions
+    .filter((session) => session.type !== 'MAX')
+    .sort((a, b) => a.finishedAt - b.finishedAt);
+  const latest = sessions.at(-1);
+  if (!latest) return null;
+  return classifySession(latest, sessions.slice(0, -1));
+}
+
+export function medianContractionOnsetPct(
+  state: AppState,
+  type: TrainingSessionType,
+): number | null {
+  const ratio = medianContractionOnsetRatio(state.sessions, type);
+  return ratio === null ? null : Math.round(ratio * 100);
 }
 
 export { isSameCalendarDay };

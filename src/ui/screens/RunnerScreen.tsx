@@ -5,14 +5,19 @@ import type { RunnerPhase } from '../../application/stores/sessionRunnerStore';
 import { ProgressRing } from '../design-system/ProgressRing';
 import { PHASE_COLOR } from '../design-system/PhaseBadge';
 import { Button } from '../design-system/Button';
+import { Card } from '../design-system/Card';
 import { formatMMSS } from '../design-system/format';
 import { useSessionTimer } from '../hooks/useSessionTimer';
 import { APNEA_DEFAULTS } from '../../domain/apnea/config';
 import { useServices } from '../app/services';
-import { useAppStore, useRunnerStore } from '../app/stores';
+import { useRunnerStore } from '../app/stores';
 import { useCues } from '../hooks/useCues';
 
-interface RunnerNavState { plan: SessionPlan; difficultyLevel: number; }
+interface RunnerNavState {
+  plan: SessionPlan;
+  difficultyLevel: number;
+  earlyContractionThresholds: number[];
+}
 
 const EMPTY_PLAN: SessionPlan = { type: 'CO2', rounds: [] };
 
@@ -39,15 +44,17 @@ export function RunnerScreen() {
   const start = useRunnerStore((s) => s.start);
   const storePlan = useRunnerStore((s) => s.plan);
   const recordRound = useRunnerStore((s) => s.recordRound);
-  const finish = useRunnerStore((s) => s.finish);
-  const complete = useAppStore((s) => s.completeSession);
+  const adjustment = useRunnerStore((s) => s.adjustment);
+  const finishDraft = useRunnerStore((s) => s.finishDraft);
 
   const [started, setStarted] = useState(false);
   const [contractions, setContractions] = useState(0);
+  const [firstContractionSec, setFirstContractionSec] = useState<number | null>(null);
   const [holdElapsed, setHoldElapsed] = useState(0);
   const [pendingRecoverAdvance, setPendingRecoverAdvance] = useState(false);
   const holdStartedAt = useRef<number | null>(null);
   const hasFinished = useRef(false);
+  const roundEnding = useRef(false);
   const lastTick = useRef<number | null>(null);
   const holdAutoEnded = useRef(false);
 
@@ -87,12 +94,16 @@ export function RunnerScreen() {
     // Inside the user gesture: unlock audio + acquire the wake lock (both required by iOS).
     cue.prime();
     await wakeLock.acquire();
-    start(navPlan, nav?.difficultyLevel ?? 0);
+    start(
+      navPlan,
+      nav?.difficultyLevel ?? 0,
+      nav?.earlyContractionThresholds ?? navPlan.rounds.map(() => 0.5),
+    );
     timer.begin();
     setStarted(true);
   }
 
-  // Deferred advance after a tap-out, so the store update lands before the phase change.
+  // Advance only after the store update lands so recovery uses an adjusted plan.
   useEffect(() => {
     if (!pendingRecoverAdvance) return;
     setPendingRecoverAdvance(false);
@@ -105,6 +116,8 @@ export function RunnerScreen() {
     if (timer.phase === 'hold') {
       holdStartedAt.current = clock.now();
       setHoldElapsed(0);
+      setFirstContractionSec(null);
+      roundEnding.current = false;
       holdAutoEnded.current = false;
       return;
     }
@@ -125,12 +138,9 @@ export function RunnerScreen() {
   useEffect(() => {
     if (timer.phase !== 'done' || hasFinished.current) return;
     hasFinished.current = true;
-    void (async () => {
-      const session = finish('normal');
-      await complete(session);
-      navigate('/summary', { state: { session } });
-    })();
-  }, [complete, finish, navigate, timer.phase]);
+    const session = finishDraft();
+    navigate('/summary', { replace: true, state: { session } });
+  }, [finishDraft, navigate, timer.phase]);
 
   function achievedHoldSec() {
     if (holdStartedAt.current === null) return 0;
@@ -142,14 +152,33 @@ export function RunnerScreen() {
     timer.startHold();
   }
   function endHold() {
-    recordRound(achievedHoldSec(), contractions, false);
-    setContractions(0);
-    timer.endHold();
-  }
-  function tapOut() {
-    recordRound(achievedHoldSec(), contractions, true);
+    if (roundEnding.current) return;
+    roundEnding.current = true;
+    recordRound(
+      achievedHoldSec(),
+      contractions,
+      firstContractionSec,
+      false,
+    );
     setContractions(0);
     setPendingRecoverAdvance(true);
+  }
+  function tapOut() {
+    if (roundEnding.current) return;
+    roundEnding.current = true;
+    recordRound(
+      achievedHoldSec(),
+      contractions,
+      firstContractionSec,
+      true,
+    );
+    setContractions(0);
+    setPendingRecoverAdvance(true);
+  }
+  function markContraction() {
+    const elapsed = achievedHoldSec();
+    setContractions((count) => count + 1);
+    setFirstContractionSec((current) => current ?? elapsed);
   }
 
   function cancel() {
@@ -188,7 +217,7 @@ export function RunnerScreen() {
   }
 
   if (timer.phase === 'done') {
-    return <p className="p-6">Saving…</p>;
+    return <p className="p-6">Preparing summary…</p>;
   }
 
   const color = PHASE_COLOR[timer.phase];
@@ -244,7 +273,22 @@ export function RunnerScreen() {
         <p className="min-h-[2.5rem] max-w-xs text-center text-sm text-[color:var(--text-dim)]">
           {PHASE_HINT[timer.phase]}
         </p>
+        {firstContractionSec !== null && (
+          <div className="text-xs text-[color:var(--text-dim)]">
+            First contraction · {formatMMSS(firstContractionSec)}
+          </div>
+        )}
       </div>
+
+      {adjustment?.reason === 'early-contractions' && (
+        <Card className="border-[color:var(--warn)]">
+          <p className="text-sm text-[color:var(--warn)]">
+            {plan.type === 'O2'
+              ? `Next hold increases paused; recovery increased by ${adjustment.restAddedSec}s.`
+              : `Recovery increased by ${adjustment.restAddedSec}s — contractions started earlier than your normal.`}
+          </p>
+        </Card>
+      )}
 
       <div className="flex flex-col gap-3 pb-2">
         {timer.phase === 'breatheUp' && (
@@ -256,7 +300,7 @@ export function RunnerScreen() {
         {isHold && (
           <>
             <div className="flex gap-3">
-              <Button variant="ghost" className="flex-1" onClick={() => setContractions((c) => c + 1)}>
+              <Button variant="ghost" className="flex-1" onClick={markContraction}>
                 Contraction · {contractions}
               </Button>
               <Button className="flex-1" onClick={endHold}>End hold</Button>

@@ -22,4 +22,12 @@ describe('routing', () => {
     renderAt('/settings');
     await waitFor(() => expect(screen.getByRole('heading', { name: /settings/i })).toBeInTheDocument());
   });
+
+  it('renders the goal screen at /goal', async () => {
+    renderAt('/goal');
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /set your goal/i }))
+        .toBeInTheDocument(),
+    );
+  });
 });

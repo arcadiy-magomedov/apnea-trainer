@@ -7,9 +7,10 @@ import { useServices } from '../app/services';
 import { useAppStore } from '../app/stores';
 import { personalBestSec, weeklySessionCount, currentStreakDays } from '../../application/stats';
 import { startTodaySession } from '../../application/usecases/startTodaySession';
-import { resolveToday } from '../../domain/apnea/courseEngine';
 import { isSameCalendarDay } from '../../domain/apnea/time';
 import { DAY_MS } from '../../domain/apnea/config';
+import { goalForecast } from '../../domain/apnea/goalEngine';
+import { GoalCard } from '../components/GoalCard';
 
 export function HomeScreen() {
   const navigate = useNavigate();
@@ -17,14 +18,21 @@ export function HomeScreen() {
   const state = useAppStore((s) => s.state);
   const now = clock.now();
   const today = startTodaySession(state, now);
+  const forecast = state.goal ? goalForecast(state, state.goal, now) : null;
   const doneToday = [...state.sessions].reverse().find((s) => isSameCalendarDay(s.finishedAt, now));
-  const tomorrow = resolveToday(state.courseState, now + DAY_MS);
+  const tomorrow = startTodaySession(state, now + DAY_MS).decision;
   const doneSubtitle = tomorrow.dayType === 'REST'
     ? 'Nice work. Tomorrow is a rest day — recover.'
     : `Nice work. Next session tomorrow: ${tomorrow.dayType}.`;
 
   function launch() {
-    navigate('/runner', { state: { plan: today.plan, difficultyLevel: today.appliedDifficulty } });
+    navigate('/runner', {
+      state: {
+        plan: today.plan,
+        difficultyLevel: today.appliedDifficulty,
+        earlyContractionThresholds: today.earlyContractionThresholds,
+      },
+    });
   }
 
   const todayTitle = today.needsBaseline
@@ -41,6 +49,17 @@ export function HomeScreen() {
       </div>
 
       <StatCard label="Personal best · static" value={formatMMSS(personalBestSec(state))} accent="var(--cyan)" />
+      {forecast ? (
+        <GoalCard
+          forecast={forecast}
+          onOpen={() => navigate('/stats', { state: { focus: 'goal' } })}
+          onSetGoal={forecast.achieved ? () => navigate('/goal') : undefined}
+        />
+      ) : (
+        <Button variant="ghost" onClick={() => navigate('/goal')}>
+          Set a max-hold goal
+        </Button>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <StatCard label="This week" value={`${weeklySessionCount(state, now)}`} />
         <StatCard label="Streak" value={`${currentStreakDays(state, now)}d`} />

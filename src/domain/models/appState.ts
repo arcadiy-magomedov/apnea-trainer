@@ -6,7 +6,7 @@ export function defaultMicrocycle(): MicrocycleTemplate {
 
 export function emptyAppState(): AppState {
   return {
-    version: 1,
+    version: 2,
     settings: {
       units: 'metric',
       voiceCues: true,
@@ -19,12 +19,16 @@ export function emptyAppState(): AppState {
     baselines: [],
     courseState: {
       position: 0,
-      difficultyLevel: 0,
+      difficultyByType: { CO2: 0, O2: 0 },
       template: defaultMicrocycle(),
+      microcycleProfile: 'balanced',
+      pendingMicrocycleProfile: null,
+      profileLockedUntil: null,
       lastTrainedAt: null,
       lastAdvanceAt: null,
       lastMaxTestAt: null,
     },
     sessions: [],
+    goal: null,
   };
 }

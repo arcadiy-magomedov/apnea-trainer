@@ -9,6 +9,7 @@ import { BaselineScreen } from '../screens/BaselineScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { ProgramScreen } from '../screens/ProgramScreen';
 import { SummaryScreen } from '../screens/SummaryScreen';
+import { SetGoalScreen } from '../screens/SetGoalScreen';
 
 function HomeOrOnboarding() {
   const state = useAppStore((s) => s.state);
@@ -25,6 +26,7 @@ export function AppRoutes() {
       <Route path="/baseline" element={<BaselineScreen />} />
       <Route path="/runner" element={<RunnerScreen />} />
       <Route path="/summary" element={<AppShell><SummaryScreen /></AppShell>} />
+      <Route path="/goal" element={<SetGoalScreen />} />
       <Route path="/" element={<HomeOrOnboarding />} />
       <Route path="/stats" element={<AppShell><StatsScreen /></AppShell>} />
       <Route path="/program" element={<AppShell><ProgramScreen /></AppShell>} />

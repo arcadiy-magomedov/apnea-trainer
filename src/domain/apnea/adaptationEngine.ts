@@ -20,30 +20,39 @@ export function applyTapOut(plan: SessionPlan, failedRoundIndex: number): Sessio
   return { type: plan.type, rounds };
 }
 
-import type { Session, ProgressionDecision } from '../models/types';
+export function applyEarlyContractionAdjustment(
+  plan: SessionPlan,
+  triggerRoundIndex: number,
+): SessionPlan {
+  if (plan.type === 'MAX') return plan;
 
-function isClean(s: Session): boolean {
-  return s.tapOuts === 0
-    && s.completedRounds === s.rounds.length
-    && (s.rpe === 'easy' || s.rpe === 'normal');
-}
-function isFailed(s: Session): boolean {
-  return s.tapOuts > 0 || s.rpe === 'failed';
-}
+  const restStepSec = APNEA_DEFAULTS.quality.adjustmentRestStepSec;
+  const triggerRound = plan.rounds.find((round) => round.index === triggerRoundIndex);
+  if (!triggerRound) {
+    return {
+      type: plan.type,
+      rounds: plan.rounds.map((round) => ({ ...round })),
+    };
+  }
+  const triggerTargetSec = triggerRound.targetHoldSec;
 
-export function evaluateProgression(orderedSessions: Session[]): ProgressionDecision {
-  const n = orderedSessions.length;
-  const last3 = orderedSessions.slice(Math.max(0, n - 3));
-  if (last3.length === 3 && last3.every(isFailed)) {
-    return { action: 'deload', suggestRetest: true };
-  }
-  const last = orderedSessions[n - 1];
-  if (last && isFailed(last)) {
-    return { action: 'repeat', suggestRetest: false };
-  }
-  const last2 = orderedSessions.slice(Math.max(0, n - 2));
-  if (last2.length === 2 && last2.every(isClean)) {
-    return { action: 'progress', suggestRetest: false };
-  }
-  return { action: 'repeat', suggestRetest: false };
+  return {
+    type: plan.type,
+    rounds: plan.rounds.map((round) => {
+      if (round.index <= triggerRoundIndex) {
+        return { ...round };
+      }
+
+      const adjusted: RoundPlan = {
+        ...round,
+        restBeforeSec: round.restBeforeSec + restStepSec,
+      };
+
+      if (plan.type === 'O2') {
+        adjusted.targetHoldSec = Math.min(round.targetHoldSec, triggerTargetSec);
+      }
+
+      return adjusted;
+    }),
+  };
 }

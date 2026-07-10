@@ -57,6 +57,12 @@ describe('courseEngine', () => {
     expect(needsRecalibration(course({ lastMaxTestAt: D('2026-07-05T00:00:00') }), D('2026-07-09T00:00:00'))).toBe(false);
   });
 
+  it('accepts an effective recalibration interval', () => {
+    const c = course({ lastMaxTestAt: D('2026-07-01T00:00:00') });
+    expect(needsRecalibration(c, D('2026-07-09T00:00:00'), 7)).toBe(true);
+    expect(needsRecalibration(c, D('2026-07-09T00:00:00'), 14)).toBe(false);
+  });
+
   it('trainedToday is true only on the same calendar day as the last training', () => {
     const c = course({ lastTrainedAt: D('2026-07-09T10:00:00') });
     expect(trainedToday(c, D('2026-07-09T23:00:00'))).toBe(true);
@@ -72,5 +78,17 @@ describe('courseEngine', () => {
     expect(resolveToday(c, trainedAt + DAY_MS).dayType).toBe('REST');
     // Two days after training, the rest day has been served and O2 becomes current.
     expect(resolveToday(c, trainedAt + 2 * DAY_MS).dayType).toBe('O2');
+  });
+
+  it('applies a queued profile when rest synchronization crosses a cycle boundary', () => {
+    const c = course({
+      position: 6,
+      pendingMicrocycleProfile: 'co2-heavy',
+      lastAdvanceAt: D('2026-07-08T00:00:00'),
+    });
+    const synced = syncRestDays(c, D('2026-07-09T10:00:00'));
+
+    expect(synced.position).toBe(7);
+    expect(synced.microcycleProfile).toBe('co2-heavy');
   });
 });

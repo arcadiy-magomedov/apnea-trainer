@@ -116,20 +116,118 @@ it('acquires a wake lock only after the user taps Start', async () => {
   expect(screen.getByText(/breathe up/i)).toBeInTheDocument();
 });
 
-it('persists once and navigates to summary when the final hold ends without a render loop', async () => {
+it('navigates with an unrated draft and persists only after Summary rating', async () => {
   vi.useFakeTimers();
-  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
   const setState = vi.fn(async () => {});
   renderRunner({ setState });
 
   await startSession();
   await advanceToHold();
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /end hold/i })); });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /end hold/i }));
+  });
   await flushAsyncWork();
 
-  expect(screen.getByRole('heading', { name: /session complete/i })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /session complete/i }))
+    .toBeInTheDocument();
+  expect(setState).not.toHaveBeenCalled();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /normal effort/i }));
+  });
+  await flushAsyncWork();
+
   expect(setState).toHaveBeenCalledOnce();
-  expect(consoleError.mock.calls.flat().join('\n')).not.toContain('Maximum update depth exceeded');
+});
+
+it('records the first contraction time once and shows it during the hold', async () => {
+  vi.useFakeTimers();
+  const clock = new FakeClock(10_000);
+  renderRunner({ clock });
+
+  await startSession();
+  await advanceToHold();
+  clock.advance(30_000);
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /contraction/i }));
+  });
+  clock.advance(10_000);
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /contraction/i }));
+  });
+
+  expect(screen.getByText(/first contraction · 0:30/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /contraction · 2/i }))
+    .toBeInTheDocument();
+});
+
+it('shows why recovery changed after two early-contraction rounds', async () => {
+  vi.useFakeTimers();
+  const clock = new FakeClock(10_000);
+  const plan: SessionPlan = {
+    type: 'CO2',
+    rounds: [
+      { index: 0, targetHoldSec: 60, restBeforeSec: 0 },
+      { index: 1, targetHoldSec: 60, restBeforeSec: 45 },
+      { index: 2, targetHoldSec: 60, restBeforeSec: 45 },
+    ],
+  };
+  renderRunner({ plan, clock });
+
+  await startSession();
+  await advanceToHold();
+  for (let round = 0; round < 2; round += 1) {
+    clock.advance(20_000);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /contraction/i }));
+    });
+    clock.advance(40_000);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /end hold/i }));
+    });
+    await flushAsyncWork();
+    if (round === 0) {
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: /start next hold/i }),
+        );
+      });
+      await flushAsyncWork();
+    }
+  }
+
+  expect(screen.getByText(/recovery increased by 15s/i)).toBeInTheDocument();
+  expect(screen.getByText('1:00')).toBeInTheDocument();
+});
+
+it('records a round once when End hold is tapped twice rapidly', async () => {
+  vi.useFakeTimers();
+  const clock = new FakeClock(1_000);
+  renderRunner({ plan: twoRoundPlan, clock });
+
+  await startSession();
+  await advanceToHold();
+  clock.advance(60_000);
+  await act(async () => {
+    const endHold = screen.getByRole('button', { name: /end hold/i });
+    fireEvent.click(endHold);
+    fireEvent.click(endHold);
+  });
+  await flushAsyncWork();
+
+  expect(screen.getByText(/^recover$/i)).toBeInTheDocument();
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /start next hold/i }));
+  });
+  clock.advance(60_000);
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /end hold/i }));
+  });
+  await flushAsyncWork();
+
+  expect(screen.getByRole('heading', { name: /session complete/i }))
+    .toBeInTheDocument();
+  expect(screen.getByText('2/2')).toBeInTheDocument();
 });
 
 it('records the actual hold duration instead of the target hold duration', async () => {

@@ -8,30 +8,25 @@ import { finishSession } from '../../application/usecases/finishSession';
 import { resolveToday } from '../../domain/apnea/courseEngine';
 import { DAY_MS } from '../../domain/apnea/config';
 import { FakeClock } from '../../test/fakeClock';
+import { makeRound, makeSession } from '../../test/fixtures';
 import type { AppState, Session } from '../../domain/models/types';
 
 const D = (iso: string) => new Date(iso).getTime();
 
 function completed(over: Partial<Session> = {}): Session {
-  return {
+  return makeSession({
     id: 's1',
     type: 'CO2',
-    rounds: Array.from({ length: 8 }, (_, i) => ({
+    rounds: Array.from({ length: 8 }, (_, i) => makeRound({
       index: i,
       targetHoldSec: 110,
       achievedHoldSec: 110,
-      restBeforeSec: 0,
-      contractions: 0,
-      tappedOut: false,
     })),
     startedAt: D('2026-07-06T10:00:00'),
     finishedAt: D('2026-07-06T10:20:00'),
-    completedRounds: 8,
-    tapOuts: 0,
     rpe: 'normal',
-    difficultyLevel: 0,
     ...over,
-  };
+  });
 }
 
 function renderProgram(state: AppState, now: number) {
@@ -70,4 +65,53 @@ it('marks the day trained today as completed instead of jumping to the next day'
   // The completed CO2 day is shown as done, not advanced to REST/"today".
   await waitFor(() => expect(screen.getByText('✓ CO2 · done today')).toBeInTheDocument());
   expect(screen.queryByText(/· today$/)).not.toBeInTheDocument();
+});
+
+it('shows a profile queued for the next microcycle', async () => {
+  const state = emptyAppState();
+  state.courseState.position = 1;
+  state.courseState.pendingMicrocycleProfile = 'o2-heavy';
+  renderProgram(state, D('2026-07-06T10:00:00'));
+
+  await waitFor(() =>
+    expect(screen.getByText(/next cycle: o2-heavy/i)).toBeInTheDocument(),
+  );
+});
+
+it('shows goal-aware assessment cadence when MAX is due', async () => {
+  const state = emptyAppState();
+  state.baselines = [{
+    id: 'b',
+    maxHoldSec: 180,
+    firstContractionSec: null,
+    measuredAt: 0,
+  }];
+  state.courseState.lastMaxTestAt = 0;
+  renderProgram(state, 15 * DAY_MS);
+
+  await waitFor(() =>
+    expect(screen.getByText(/max assessment due/i)).toBeInTheDocument(),
+  );
+  expect(screen.getByText(/MAX · today/i)).toBeInTheDocument();
+});
+
+it('keeps a planned rest day and explains when due MAX will run', async () => {
+  const state = emptyAppState();
+  state.baselines = [{
+    id: 'b',
+    maxHoldSec: 180,
+    firstContractionSec: null,
+    measuredAt: 0,
+  }];
+  state.courseState.lastMaxTestAt = 0;
+  state.courseState.position = 1;
+  renderProgram(state, 15 * DAY_MS);
+
+  await waitFor(() =>
+    expect(screen.getByText(/max assessment due/i)).toBeInTheDocument(),
+  );
+  expect(screen.getByText(/planned rest remains.*next training session/i))
+    .toBeInTheDocument();
+  expect(screen.getByText(/REST · today/i)).toBeInTheDocument();
+  expect(screen.queryByText(/MAX · today/i)).not.toBeInTheDocument();
 });

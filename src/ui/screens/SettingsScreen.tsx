@@ -1,13 +1,21 @@
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../app/stores';
 import { Card } from '../design-system/Card';
 import { Button } from '../design-system/Button';
 import { exportJson, importJson } from '../../infrastructure/persistence/jsonBackup';
+import { formatMMSS } from '../design-system/format';
 
 export function SettingsScreen() {
+  const navigate = useNavigate();
   const hydrated = useAppStore((s) => s.hydrated);
   const state = useAppStore((s) => s.state);
   const update = useAppStore((s) => s.updateSettings);
   const replaceState = useAppStore((s) => s.replaceState);
+  const clearGoal = useAppStore((store) => store.clearGoal);
+  const [clearingGoal, setClearingGoal] = useState(false);
+  const [goalError, setGoalError] = useState<string | null>(null);
+  const clearingGoalRef = useRef(false);
   const { settings } = state;
   const appVersion = (globalThis as { __APP_VERSION__?: string }).__APP_VERSION__ ?? __APP_VERSION__;
 
@@ -30,6 +38,23 @@ export function SettingsScreen() {
     URL.revokeObjectURL(url);
   }
 
+  async function onClearGoal() {
+    if (clearingGoalRef.current) return;
+    clearingGoalRef.current = true;
+    setClearingGoal(true);
+    setGoalError(null);
+    try {
+      await clearGoal();
+    } catch (error) {
+      setGoalError(
+        error instanceof Error ? error.message : 'Could not clear the goal',
+      );
+    } finally {
+      clearingGoalRef.current = false;
+      setClearingGoal(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-2xl font-bold">Settings</h2>
@@ -41,6 +66,33 @@ export function SettingsScreen() {
         {toggle('voiceCues', 'Voice cues')}
         {toggle('beepCues', 'Beep cues')}
         {toggle('vibrationCues', 'Vibration cues')}
+      </Card>
+      <Card>
+        <div className="mb-2 text-xs uppercase tracking-wider text-[color:var(--text-mute)]">
+          Goal
+        </div>
+        {state.goal ? (
+          <div className="grid gap-2">
+            <div className="text-sm">
+              Target: {formatMMSS(state.goal.targetHoldSec)}
+            </div>
+            <Button variant="ghost" onClick={() => navigate('/goal')}>Edit goal</Button>
+            <Button
+              variant="danger"
+              disabled={clearingGoal}
+              onClick={() => void onClearGoal()}
+            >
+              Clear goal
+            </Button>
+            {goalError && (
+              <p role="alert" className="text-sm text-[color:var(--danger)]">
+                {goalError}
+              </p>
+            )}
+          </div>
+        ) : (
+          <Button variant="ghost" onClick={() => navigate('/goal')}>Set a goal</Button>
+        )}
       </Card>
       <Card>
         <div className="mb-2 text-xs uppercase tracking-wider text-[color:var(--text-mute)]">Data</div>

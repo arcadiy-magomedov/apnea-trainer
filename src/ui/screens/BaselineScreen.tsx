@@ -10,9 +10,13 @@ import { useAppStore } from '../app/stores';
 export function BaselineScreen() {
   const navigate = useNavigate();
   const record = useAppStore((s) => s.recordBaseline);
+  const hydrated = useAppStore((state) => state.hydrated);
+  const hadBaseline = useAppStore((state) => state.state.baselines.length > 0);
   const { seconds, running, start, stop, reset } = useCountUp();
   const [attempts, setAttempts] = useState<number[]>([]);
   const [firstContraction, setFirstContraction] = useState<number | null>(null);
+
+  if (!hydrated) return null;
 
   function onStop() {
     stop();
@@ -22,7 +26,7 @@ export function BaselineScreen() {
 
   async function finish() {
     await record(attempts, firstContraction);
-    navigate('/');
+    navigate(hadBaseline ? '/' : '/goal');
   }
 
   return (

@@ -1,5 +1,6 @@
 import type { CourseState, DayType, TodayDecision } from '../models/types';
 import { APNEA_DEFAULTS, DAY_MS } from './config';
+import { applyPendingProfileAtBoundary } from './microcycleProfiles';
 import { startOfDay, isSameCalendarDay } from './time';
 
 function slotAt(c: CourseState, position: number): DayType {
@@ -17,23 +18,40 @@ export function syncRestDays(c: CourseState, now: number): CourseState {
     position += 1;
     lastAdvanceAt = startOfDay(lastAdvanceAt) + DAY_MS;
   }
-  return { ...c, position, lastAdvanceAt };
+  return applyPendingProfileAtBoundary({
+    ...c,
+    position,
+    lastAdvanceAt,
+  }, now);
 }
 
-export function needsRecalibration(c: CourseState, now: number): boolean {
+export function needsRecalibration(
+  c: CourseState,
+  now: number,
+  intervalDays: number = APNEA_DEFAULTS.recalibrationDays,
+): boolean {
   if (c.lastMaxTestAt === null) return false;
-  return now - c.lastMaxTestAt >= APNEA_DEFAULTS.recalibrationDays * DAY_MS;
+  return now - c.lastMaxTestAt >= intervalDays * DAY_MS;
 }
 
-export function resolveToday(c: CourseState, now: number): TodayDecision {
+export function resolveToday(
+  c: CourseState,
+  now: number,
+  recalibrationIntervalDays: number = APNEA_DEFAULTS.recalibrationDays,
+): TodayDecision {
   const synced = syncRestDays(c, now);
   let dayType = slotAt(synced, synced.position);
-  if (dayType !== 'REST' && needsRecalibration(synced, now)) {
+  if (
+    dayType !== 'REST'
+    && needsRecalibration(synced, now, recalibrationIntervalDays)
+  ) {
     dayType = 'MAX';
   }
   const gapDays = synced.lastTrainedAt === null
     ? 0
-    : Math.round((startOfDay(now) - startOfDay(synced.lastTrainedAt)) / DAY_MS);
+    : Math.round(
+        (startOfDay(now) - startOfDay(synced.lastTrainedAt)) / DAY_MS,
+      );
   const deload = gapDays > APNEA_DEFAULTS.detraining.deloadDays;
   const suggestRetest = gapDays > APNEA_DEFAULTS.detraining.retestDays;
 
@@ -42,7 +60,10 @@ export function resolveToday(c: CourseState, now: number): TodayDecision {
   if (dayType === 'REST') {
     blocked = true;
     reason = 'Rest day — recovery is part of the program';
-  } else if (synced.lastTrainedAt !== null && isSameCalendarDay(synced.lastTrainedAt, now)) {
+  } else if (
+    synced.lastTrainedAt !== null
+    && isSameCalendarDay(synced.lastTrainedAt, now)
+  ) {
     blocked = true;
     reason = 'Already trained today';
   }
@@ -50,7 +71,7 @@ export function resolveToday(c: CourseState, now: number): TodayDecision {
 }
 
 export function completeSession(c: CourseState, now: number): CourseState {
-  return {
+  return applyPendingProfileAtBoundary({
     ...c,
     position: c.position + 1,
     lastTrainedAt: now,
@@ -58,7 +79,7 @@ export function completeSession(c: CourseState, now: number): CourseState {
     // its own calendar day (it is consumed the day *after* it becomes current),
     // matching the microcycle the Program screen shows.
     lastAdvanceAt: startOfDay(now) + DAY_MS,
-  };
+  }, now);
 }
 
 export function trainedToday(c: CourseState, now: number): boolean {

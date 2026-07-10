@@ -7,7 +7,10 @@ describe('domain barrel', () => {
     expect(typeof domain.generateO2Table).toBe('function');
     expect(typeof domain.generatePlanForDay).toBe('function');
     expect(typeof domain.applyTapOut).toBe('function');
-    expect(typeof domain.evaluateProgression).toBe('function');
+    expect(typeof domain.evaluateTypeProgression).toBe('function');
+    expect(typeof domain.updateMicrocycleProfile).toBe('function');
+    expect(typeof domain.goalForecast).toBe('function');
+    expect(typeof domain.assessmentSchedule).toBe('function');
     expect(typeof domain.resolveToday).toBe('function');
     expect(typeof domain.completeSession).toBe('function');
     expect(typeof domain.computeBaseline).toBe('function');
