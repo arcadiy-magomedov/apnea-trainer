@@ -7,7 +7,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { RunnerScreen } from '../screens/RunnerScreen';
 import { BaselineScreen } from '../screens/BaselineScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
-import { ProgramScreen } from '../screens/ProgramScreen';
+import { CalendarScreen } from '../screens/CalendarScreen';
 import { SummaryScreen } from '../screens/SummaryScreen';
 import { SetGoalScreen } from '../screens/SetGoalScreen';
 
@@ -16,7 +16,7 @@ function HomeOrOnboarding() {
   const hydrated = useAppStore((s) => s.hydrated);
   if (!hydrated) return null;
   if (!state.settings.onboarded) return <Navigate to="/onboarding" replace />;
-  return <AppShell><HomeScreen /></AppShell>;
+  return <HomeScreen />;
 }
 
 export function AppRoutes() {
@@ -29,7 +29,8 @@ export function AppRoutes() {
       <Route path="/goal" element={<SetGoalScreen />} />
       <Route path="/" element={<HomeOrOnboarding />} />
       <Route path="/stats" element={<AppShell><StatsScreen /></AppShell>} />
-      <Route path="/program" element={<AppShell><ProgramScreen /></AppShell>} />
+      <Route path="/calendar" element={<AppShell><CalendarScreen /></AppShell>} />
+      <Route path="/program" element={<Navigate to="/calendar" replace />} />
       <Route path="/settings" element={<AppShell><SettingsScreen /></AppShell>} />
     </Routes>
   );

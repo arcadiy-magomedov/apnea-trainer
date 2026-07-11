@@ -3,13 +3,16 @@ import { NavLink } from 'react-router-dom';
 const TABS = [
   { to: '/', icon: '🏠', label: 'Home' },
   { to: '/stats', icon: '📊', label: 'Stats' },
-  { to: '/program', icon: '🗓️', label: 'Program' },
+  { to: '/calendar', icon: '🗓️', label: 'Calendar' },
   { to: '/settings', icon: '⚙️', label: 'Settings' },
 ];
 
 export function TabBar() {
   return (
-    <nav className="flex justify-around border-t border-[color:var(--border)] bg-surface py-2">
+    <nav
+      className="flex shrink-0 justify-around border-t border-[color:var(--border)] bg-surface pt-2"
+      style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+    >
       {TABS.map((t) => (
         <NavLink
           key={t.to}

@@ -34,6 +34,6 @@ it('shows Home once onboarded, even without a baseline (no safety wall on every 
       </MemoryRouter>
     </AppProviders></ServicesProvider>,
   );
-  await waitFor(() => expect(screen.getByText(/measure your baseline/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: /measure baseline/i })).toBeInTheDocument());
   expect(screen.queryByRole('button', { name: /continue/i })).not.toBeInTheDocument();
 });

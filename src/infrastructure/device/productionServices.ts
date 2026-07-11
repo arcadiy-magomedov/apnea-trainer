@@ -4,7 +4,6 @@ import { createWakeLock } from './wakeLock';
 import { withReacquire } from './wakeLockWithReacquire';
 import { createCues } from './cues';
 import { createLocalNotifications } from '../notifications/localNotifications';
-import { buildIcs } from '../notifications/icsExporter';
 import { createIndexedDbRepository } from '../persistence/indexedDbRepository';
 
 export function productionServices(): Services {
@@ -13,7 +12,6 @@ export function productionServices(): Services {
     wakeLock: withReacquire(createWakeLock()),
     cues: createCues(),
     notifications: createLocalNotifications(),
-    ics: { build: buildIcs },
     repository: createIndexedDbRepository(),
   };
 }

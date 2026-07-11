@@ -80,6 +80,17 @@ describe('courseEngine', () => {
     expect(resolveToday(c, trainedAt + 2 * DAY_MS).dayType).toBe('O2');
   });
 
+  it('keeps today as REST for a pre-fix anchor saved on the training day', () => {
+    const trainedAt = D('2026-07-09T18:00:00');
+    const c = course({
+      position: 1,
+      lastTrainedAt: trainedAt,
+      lastAdvanceAt: D('2026-07-09T00:00:00'),
+    });
+
+    expect(resolveToday(c, D('2026-07-10T10:00:00')).dayType).toBe('REST');
+  });
+
   it('applies a queued profile when rest synchronization crosses a cycle boundary', () => {
     const c = course({
       position: 6,

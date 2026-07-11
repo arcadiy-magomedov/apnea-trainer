@@ -7,6 +7,5 @@ it('builds a full services bundle', () => {
   expect(typeof s.wakeLock.acquire).toBe('function');
   expect(typeof s.cues.speak).toBe('function');
   expect(typeof s.notifications.isSupported).toBe('function');
-  expect(typeof s.ics.build).toBe('function');
   expect(typeof s.repository.getState).toBe('function');
 });

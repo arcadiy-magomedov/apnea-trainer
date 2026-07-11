@@ -37,15 +37,36 @@ function completedSession(finishedAt: number): Session {
   });
 }
 
-it('shows the personal-best stat card', async () => {
-  render(
-    <ServicesProvider>
-      <AppProviders>
-        <MemoryRouter><HomeScreen /></MemoryRouter>
-      </AppProviders>
-    </ServicesProvider>,
+it('removes duplicate headings and Stats metrics from Home', async () => {
+  const state = emptyAppState();
+  state.baselines = [{
+    id: 'baseline', maxHoldSec: 180, firstContractionSec: null,
+    measuredAt: D('2026-07-01T10:00:00'),
+  }];
+  renderHome(state, D('2026-07-09T10:00:00'));
+
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /start CO₂ session/i }))
+      .toBeInTheDocument(),
   );
-  await waitFor(() => expect(screen.getByText(/personal best/i)).toBeInTheDocument());
+  expect(screen.queryByText(/ready to train/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: /apnea trainer/i }))
+    .not.toBeInTheDocument();
+  expect(screen.queryByText(/personal best/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/this week/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/streak/i)).not.toBeInTheDocument();
+});
+
+it('keeps the goal card above the persistent Hero', async () => {
+  const state = emptyAppState();
+  state.baselines = [{ id: 'baseline', maxHoldSec: 180, firstContractionSec: null, measuredAt: D('2026-07-01T10:00:00') }];
+  state.goal = { id: 'goal', targetHoldSec: 240, createdAt: D('2026-07-01T10:00:00'), startMaxSec: 180, achievedAt: null };
+  renderHome(state, D('2026-07-09T10:00:00'));
+  await waitFor(() => {
+    expect(screen.getByText(/max-hold goal/i)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /primary action/i }))
+      .toContainElement(screen.getByRole('button', { name: /start CO₂ session/i }));
+  });
 });
 
 it('shows a goal CTA when no goal exists', async () => {
@@ -73,19 +94,22 @@ it('explains when a due MAX assessment is postponed for recovery', async () => {
 
   renderHome(state, now);
   await waitFor(() =>
-    expect(screen.getByText(/postponed for recovery/i)).toBeInTheDocument(),
+    expect(screen.getByText(/MAX assessment postponed/i)).toBeInTheDocument(),
   );
+  expect(screen.getByText(/Recovery gate is active/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /start/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /train anyway/i })).not.toBeInTheDocument();
 });
 
-it('shows a completed check for the session finished today, and that tomorrow is a rest day', async () => {
+it('shows a completed session in the Hero dock without Start actions', async () => {
   const now = D('2026-07-06T18:00:00');
   const state = finishSession(emptyAppState(), completedSession(D('2026-07-06T10:20:00')), D('2026-07-06T10:20:00'));
 
   renderHome(state, now);
 
-  // Today's completed CO2 is shown as done — not as "Rest day" as today's title.
-  await waitFor(() => expect(screen.getByText(/CO2 session · done/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/CO₂ session complete/i)).toBeInTheDocument());
   expect(screen.queryByRole('button', { name: /start .* session/i })).not.toBeInTheDocument();
-  // The default microcycle puts a rest day after CO2, and the copy reflects it.
-  expect(screen.getByText(/tomorrow is a rest day/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /train anyway/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: /primary action/i }))
+    .toContainElement(screen.getByText(/CO₂ session complete/i));
 });

@@ -30,4 +30,16 @@ describe('routing', () => {
         .toBeInTheDocument(),
     );
   });
+
+  it('renders Calendar at /calendar', async () => {
+    renderAt('/calendar');
+    expect(await screen.findByRole('heading', { name: 'Calendar' }))
+      .toBeInTheDocument();
+  });
+
+  it('redirects legacy /program links to Calendar', async () => {
+    renderAt('/program');
+    expect(await screen.findByRole('heading', { name: 'Calendar' }))
+      .toBeInTheDocument();
+  });
 });

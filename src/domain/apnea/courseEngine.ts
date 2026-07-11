@@ -10,6 +10,14 @@ function slotAt(c: CourseState, position: number): DayType {
 export function syncRestDays(c: CourseState, now: number): CourseState {
   let position = c.position;
   let lastAdvanceAt = c.lastAdvanceAt ?? startOfDay(now);
+  if (
+    slotAt(c, position) === 'REST'
+    && c.lastTrainedAt !== null
+    && startOfDay(lastAdvanceAt) <= startOfDay(c.lastTrainedAt)
+  ) {
+    // Older app versions anchored the new REST slot on the training day.
+    lastAdvanceAt = startOfDay(c.lastTrainedAt) + DAY_MS;
+  }
   // Consume REST slots for each calendar day that has elapsed.
   while (
     slotAt(c, position) === 'REST' &&

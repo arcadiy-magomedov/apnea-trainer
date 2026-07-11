@@ -3,7 +3,6 @@ import type { Clock } from '../../domain/ports/clock';
 import type { WakeLockService } from '../../domain/ports/wakeLockService';
 import type { CueService } from '../../domain/ports/cueService';
 import type { NotificationService } from '../../domain/ports/notificationService';
-import type { IcsExporter } from '../../domain/ports/icsExporter';
 import type { StateRepository } from '../../domain/ports/stateRepository';
 import { productionServices } from '../../infrastructure/device/productionServices';
 
@@ -12,7 +11,6 @@ export interface Services {
   wakeLock: WakeLockService;
   cues: CueService;
   notifications: NotificationService;
-  ics: IcsExporter;
   repository: StateRepository;
 }
 
