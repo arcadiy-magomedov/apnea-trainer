@@ -1,12 +1,17 @@
 import { it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ServicesProvider } from '../app/services';
 import { AppProviders } from '../app/stores';
 import { SettingsScreen } from './SettingsScreen';
 import { emptyAppState } from '../../domain/models/appState';
 import type { AppState } from '../../domain/models/types';
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+}
 
 it('toggles voice cues and persists', async () => {
   render(
@@ -54,6 +59,25 @@ it('clears an active goal', async () => {
     await screen.findByRole('button', { name: /clear goal/i }),
   );
   await waitFor(() => expect(saved.at(-1)?.goal).toBeNull());
+});
+
+it('navigates to breath sonar from the experiments card', async () => {
+  render(
+    <ServicesProvider>
+      <AppProviders>
+        <MemoryRouter initialEntries={['/settings']}>
+          <Routes>
+            <Route path="/settings" element={<SettingsScreen />} />
+            <Route path="/breath-debug" element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </AppProviders>
+    </ServicesProvider>,
+  );
+
+  const button = await screen.findByRole('button', { name: /breath sonar/i });
+  await userEvent.click(button);
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/breath-debug'));
 });
 
 it('reports clear-goal persistence failures and prevents duplicate writes', async () => {

@@ -112,6 +112,21 @@ export function SettingsScreen() {
           </label>
         </div>
       </Card>
+      <Card>
+        <div className="mb-2 text-xs uppercase tracking-wider text-[color:var(--text-mute)]">
+          Experiments
+        </div>
+        <p className="text-sm text-[color:var(--text-dim)]">
+          Test on-device browser sensors before they become training features.
+        </p>
+        <Button
+          variant="ghost"
+          className="mt-3 w-full"
+          onClick={() => navigate('/breath-debug')}
+        >
+          Breath sonar
+        </Button>
+      </Card>
       <Card className="border-[color:var(--danger)]">
         <p className="text-xs text-[color:var(--text-dim)]">
           Dry land only. Never train in or near water alone. No hyperventilation.
