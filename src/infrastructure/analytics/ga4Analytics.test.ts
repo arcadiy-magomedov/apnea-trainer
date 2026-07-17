@@ -3,11 +3,12 @@ import { createGa4Analytics } from './ga4Analytics';
 import { noopAnalytics } from './noopAnalytics';
 
 type GtagCommand = [command: string, ...args: unknown[]];
+type QueuedGtagCommand = GtagCommand | IArguments;
 type GaDisableFlags = {
   [key in `ga-disable-${string}`]?: boolean;
 };
 type TestAnalyticsWindow = Window & GaDisableFlags & {
-  dataLayer?: GtagCommand[];
+  dataLayer?: QueuedGtagCommand[];
   gtag?: unknown;
 };
 
@@ -21,8 +22,20 @@ function analyticsWindow(win: Window = window): TestAnalyticsWindow {
   return win as TestAnalyticsWindow;
 }
 
-function dataLayerCommands(win: Window = window): GtagCommand[] {
+function rawDataLayerCommands(
+  win: Window = window,
+): QueuedGtagCommand[] {
   return analyticsWindow(win).dataLayer ?? [];
+}
+
+function dataLayerCommands(win: Window = window): GtagCommand[] {
+  return rawDataLayerCommands(win).map((entry) => {
+    const [command, ...args] = Array.from(entry);
+    if (typeof command !== 'string') {
+      throw new Error('Invalid test analytics command.');
+    }
+    return [command, ...args];
+  });
 }
 
 function clearAnalyticsRegistry(doc: Document = document): void {
@@ -225,6 +238,21 @@ describe('GA4 analytics adapter', () => {
         page_location: `${window.location.origin}/stats`,
       }),
     ]);
+  });
+
+  it('queues documented arguments objects for Google tag compatibility', async () => {
+    const analytics = createGa4Analytics({
+      measurementId: MEASUREMENT_ID,
+      strict: true,
+    });
+
+    await analytics.setConsent('granted');
+
+    const entries = rawDataLayerCommands();
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.every(
+      (entry) => Object.prototype.toString.call(entry) === '[object Arguments]',
+    )).toBe(true);
   });
 
   it('fails closed when a pre-existing gtag is not a function', async () => {

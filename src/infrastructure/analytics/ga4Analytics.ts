@@ -469,12 +469,13 @@ function createGa4AnalyticsService(
         return false;
       }
       if (win.gtag === undefined) {
-        win.gtag = (...command: GtagCommand) => {
+        win.gtag = function gtag() {
           const dataLayer = win.dataLayer;
           if (!Array.isArray(dataLayer)) {
             throw new Error('GA4 command queue is unavailable.');
           }
-          dataLayer.push(command);
+          // Google's loader expects the documented arguments-object queue.
+          dataLayer.push(arguments);
         };
       }
       return typeof win.gtag === 'function';
