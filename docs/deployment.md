@@ -11,6 +11,21 @@ Static PWA hosted on DigitalOcean App Platform (static site component).
    - **Autodeploy** on push to `main`: enabled.
 2. Authorize DigitalOcean's GitHub app for the repository.
 
+## Analytics build configuration
+
+The static build reads two public build-time variables:
+
+- `VITE_GA_MEASUREMENT_ID` - GA4 web-stream Measurement ID.
+- `VITE_PRIVACY_CONTACT_EMAIL` - public contact shown for analytics
+  access/deletion requests.
+
+Configure both on the DigitalOcean static-site component before enabling the
+analytics release. A missing or invalid Measurement ID or privacy contact keeps
+analytics as the exact no-op implementation.
+
+Follow `docs/analytics-setup.md` one checkpoint at a time. Do not add an
+AdSense link or live ad code during the analytics-foundation release.
+
 ## Flow
 - Every push/PR runs **CI** (typecheck, tests, build) via `.github/workflows/ci.yml`.
 - App Platform **autodeploys** on every push to `main` (builds from source, publishes the

@@ -8,6 +8,7 @@ import { SummaryScreen } from './SummaryScreen';
 import { noopCues, noopWakeLock } from '../../infrastructure/device/noopServices';
 import { emptyAppState } from '../../domain/models/appState';
 import type { AppState, SessionPlan } from '../../domain/models/types';
+import { FakeAnalyticsService } from '../../test/fakeAnalytics';
 import { FakeClock } from '../../test/fakeClock';
 
 const shortPlan: SessionPlan = {
@@ -25,6 +26,7 @@ const twoRoundPlan: SessionPlan = {
 
 interface RenderRunnerOptions {
   plan?: SessionPlan;
+  analytics?: FakeAnalyticsService;
   clock?: FakeClock;
   setState?: (state: AppState) => Promise<void>;
   wakeLock?: typeof noopWakeLock;
@@ -33,6 +35,7 @@ interface RenderRunnerOptions {
 
 function renderRunner({
   plan = shortPlan,
+  analytics = new FakeAnalyticsService(),
   clock = new FakeClock(1_000),
   setState = vi.fn(async (_state: AppState) => {}),
   wakeLock = noopWakeLock,
@@ -43,8 +46,8 @@ function renderRunner({
     setState,
   };
 
-  render(
-    <ServicesProvider value={{ clock, repository, wakeLock, cues }}>
+  const view = render(
+    <ServicesProvider value={{ analytics, clock, repository, wakeLock, cues }}>
       <AppProviders>
         <MemoryRouter initialEntries={[{ pathname: '/runner', state: { plan, difficultyLevel: 0 } }]}>
           <Routes>
@@ -57,7 +60,7 @@ function renderRunner({
     </ServicesProvider>,
   );
 
-  return { clock, repository, setState };
+  return { analytics, clock, repository, setState, view };
 }
 
 function renderRunnerWithoutNavigationState() {
@@ -116,10 +119,102 @@ it('acquires a wake lock only after the user taps Start', async () => {
   expect(screen.getByText(/breathe up/i)).toBeInTheDocument();
 });
 
+it('tracks one start and one coarse abandonment from the start action', async () => {
+  vi.useFakeTimers();
+  let releaseAcquire!: () => void;
+  const acquirePromise = new Promise<void>((resolve) => {
+    releaseAcquire = resolve;
+  });
+  const acquire = vi.fn(() => acquirePromise);
+  const analytics = new FakeAnalyticsService();
+  const clock = new FakeClock(1_000);
+  renderRunner({
+    analytics,
+    clock,
+    wakeLock: { ...noopWakeLock, acquire },
+  });
+
+  const startButton = screen.getByRole('button', { name: /start session/i });
+  await act(async () => {
+    fireEvent.click(startButton);
+    fireEvent.click(startButton);
+  });
+
+  expect(acquire).toHaveBeenCalledOnce();
+  expect(analytics.events).toEqual([]);
+
+  clock.advance(9 * 60_000);
+  await act(async () => {
+    releaseAcquire();
+    await acquirePromise;
+  });
+  await flushAsyncWork();
+
+  clock.advance(2 * 60_000);
+  await act(async () => {
+    fireEvent.click(
+      screen.getByRole('button', { name: /cancel session/i }),
+    );
+  });
+
+  expect(analytics.events).toEqual([
+    {
+      name: 'training_session_started',
+      sessionType: 'co2',
+    },
+    {
+      name: 'training_session_abandoned',
+      sessionType: 'co2',
+      durationBucket: '10_to_20m',
+    },
+  ]);
+  expect(JSON.stringify(analytics.events)).not.toMatch(
+    /contraction|phase|achievedHold|targetHold|tapOut|startedAt|finishedAt|sessionId/i,
+  );
+});
+
+it('tracks coarse abandonment when an active Runner is exited', async () => {
+  vi.useFakeTimers();
+  const analytics = new FakeAnalyticsService();
+  const clock = new FakeClock(1_000);
+  const { view } = renderRunner({ analytics, clock });
+
+  await startSession();
+  clock.advance(21 * 60_000);
+  view.unmount();
+
+  expect(analytics.events).toEqual([
+    {
+      name: 'training_session_started',
+      sessionType: 'co2',
+    },
+    {
+      name: 'training_session_abandoned',
+      sessionType: 'co2',
+      durationBucket: '20_to_30m',
+    },
+  ]);
+});
+
+it('does not track abandonment before a session starts', () => {
+  const analytics = new FakeAnalyticsService();
+  const release = vi.fn(async () => {});
+  const { view } = renderRunner({
+    analytics,
+    wakeLock: { ...noopWakeLock, release },
+  });
+
+  view.unmount();
+
+  expect(analytics.events).toEqual([]);
+  expect(release).toHaveBeenCalledOnce();
+});
+
 it('navigates with an unrated draft and persists only after Summary rating', async () => {
   vi.useFakeTimers();
+  const analytics = new FakeAnalyticsService();
   const setState = vi.fn(async () => {});
-  renderRunner({ setState });
+  renderRunner({ analytics, setState });
 
   await startSession();
   await advanceToHold();
@@ -131,6 +226,10 @@ it('navigates with an unrated draft and persists only after Summary rating', asy
   expect(screen.getByRole('heading', { name: /session complete/i }))
     .toBeInTheDocument();
   expect(setState).not.toHaveBeenCalled();
+  expect(analytics.events).toEqual([{
+    name: 'training_session_started',
+    sessionType: 'co2',
+  }]);
 
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: /normal effort/i }));
@@ -138,6 +237,9 @@ it('navigates with an unrated draft and persists only after Summary rating', asy
   await flushAsyncWork();
 
   expect(setState).toHaveBeenCalledOnce();
+  expect(analytics.events).not.toContainEqual(
+    expect.objectContaining({ name: 'training_session_abandoned' }),
+  );
 });
 
 it('records the first contraction time once and shows it during the hold', async () => {

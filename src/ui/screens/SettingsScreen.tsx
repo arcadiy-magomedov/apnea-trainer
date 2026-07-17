@@ -1,13 +1,25 @@
-import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../app/stores';
 import { Card } from '../design-system/Card';
 import { Button } from '../design-system/Button';
 import { exportJson, importJson } from '../../infrastructure/persistence/jsonBackup';
 import { formatMMSS } from '../design-system/format';
+import { useAnalyticsConsent } from '../analytics/AnalyticsConsentProvider';
+import { useServices } from '../app/services';
+
+type AnalyticsIdentifierState =
+  | { status: 'hidden' }
+  | { status: 'loading' }
+  | { status: 'success'; value: string }
+  | { status: 'error' };
+
+const ANALYTICS_IDENTIFIER_ERROR =
+  'Could not load the pseudonymous analytics identifier.';
 
 export function SettingsScreen() {
   const navigate = useNavigate();
+  const { analytics } = useServices();
   const hydrated = useAppStore((s) => s.hydrated);
   const state = useAppStore((s) => s.state);
   const update = useAppStore((s) => s.updateSettings);
@@ -16,8 +28,70 @@ export function SettingsScreen() {
   const [clearingGoal, setClearingGoal] = useState(false);
   const [goalError, setGoalError] = useState<string | null>(null);
   const clearingGoalRef = useRef(false);
+  const {
+    active: analyticsActive,
+    available: analyticsAvailable,
+    consent,
+    ready: analyticsReady,
+    error: analyticsError,
+    choose,
+    getAnonymousId,
+  } = useAnalyticsConsent();
+  const [analyticsIdentifier, setAnalyticsIdentifier] =
+    useState<AnalyticsIdentifierState>({ status: 'hidden' });
   const { settings } = state;
   const appVersion = (globalThis as { __APP_VERSION__?: string }).__APP_VERSION__ ?? __APP_VERSION__;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (
+      !analyticsAvailable
+      || !analyticsActive
+      || !analyticsReady
+      || consent !== 'granted'
+    ) {
+      setAnalyticsIdentifier({ status: 'hidden' });
+      return;
+    }
+
+    setAnalyticsIdentifier({ status: 'loading' });
+    void getAnonymousId()
+      .then((id) => {
+        if (cancelled) return;
+        setAnalyticsIdentifier(
+          id
+            ? { status: 'success', value: id }
+            : { status: 'error' },
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setAnalyticsIdentifier({ status: 'error' });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    analyticsActive,
+    analyticsAvailable,
+    analyticsReady,
+    consent,
+    getAnonymousId,
+  ]);
+
+  async function retryAnalyticsIdentifier() {
+    setAnalyticsIdentifier({ status: 'loading' });
+    try {
+      const id = await getAnonymousId();
+      setAnalyticsIdentifier(
+        id
+          ? { status: 'success', value: id }
+          : { status: 'error' },
+      );
+    } catch {
+      setAnalyticsIdentifier({ status: 'error' });
+    }
+  }
 
   const toggle = (key: 'voiceCues' | 'beepCues' | 'vibrationCues', label: string) => (
     <label className="flex items-center justify-between py-1 text-sm">
@@ -45,6 +119,7 @@ export function SettingsScreen() {
     setGoalError(null);
     try {
       await clearGoal();
+      analytics.track({ name: 'goal_cleared' });
     } catch (error) {
       setGoalError(
         error instanceof Error ? error.message : 'Could not clear the goal',
@@ -111,6 +186,85 @@ export function SettingsScreen() {
             />
           </label>
         </div>
+      </Card>
+      <Card>
+        <div className="mb-2 text-xs uppercase tracking-wider text-[color:var(--text-mute)]">
+          Privacy
+        </div>
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span>Share anonymous usage analytics</span>
+          <input
+            type="checkbox"
+            aria-label="Share anonymous usage analytics"
+            checked={consent === 'granted'}
+            disabled={!analyticsAvailable || !analyticsReady}
+            onChange={(event) => {
+              void choose(event.target.checked ? 'granted' : 'denied');
+            }}
+          />
+        </label>
+        {analyticsAvailable
+          && analyticsActive
+          && consent === 'granted'
+          && analyticsIdentifier.status !== 'hidden'
+          && (
+          <div className="mt-2 text-xs text-[color:var(--text-dim)]">
+            <div>Pseudonymous analytics identifier</div>
+            {analyticsIdentifier.status === 'loading' && (
+              <p role="status" className="mt-1">
+                Loading analytics identifier…
+              </p>
+            )}
+            {analyticsIdentifier.status === 'error' && (
+              <>
+                <p role="alert" className="mt-1 text-[color:var(--danger)]">
+                  {ANALYTICS_IDENTIFIER_ERROR}
+                </p>
+                <Button
+                  variant="ghost"
+                  className="mt-2 px-3 py-2 text-sm"
+                  onClick={() => void retryAnalyticsIdentifier()}
+                >
+                  Retry loading analytics identifier
+                </Button>
+              </>
+            )}
+            {analyticsIdentifier.status === 'success' && (
+              <label className="block">
+                <span className="sr-only">
+                  Pseudonymous analytics identifier
+                </span>
+                <input
+                  readOnly
+                  aria-label="Pseudonymous analytics identifier"
+                  value={analyticsIdentifier.value}
+                  className="mt-1 w-full rounded-lg bg-[color:var(--surface-2)] px-2 py-1 font-mono"
+                />
+                <span className="mt-1 block">
+                  Copy this before turning analytics off if you want to request
+                  deletion.
+                </span>
+              </label>
+            )}
+          </div>
+        )}
+        {analyticsError && (
+          <p role="alert" className="mt-2 text-sm text-[color:var(--danger)]">
+            {analyticsError}
+          </p>
+        )}
+        {!analyticsAvailable && (
+          <p className="mt-2 text-xs text-[color:var(--text-dim)]">
+            Analytics is not configured in this build. No usage analytics will
+            leave this device.
+          </p>
+        )}
+        <Link
+          className="mt-3 inline-block text-sm text-[color:var(--cyan)]"
+          to="/privacy"
+        >
+          Privacy details
+        </Link>
       </Card>
       <Card>
         <div className="mb-2 text-xs uppercase tracking-wider text-[color:var(--text-mute)]">

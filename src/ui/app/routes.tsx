@@ -10,6 +10,7 @@ import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { SummaryScreen } from '../screens/SummaryScreen';
 import { SetGoalScreen } from '../screens/SetGoalScreen';
+import { PrivacyScreen } from '../screens/PrivacyScreen';
 import { BreathDebugScreen } from '../screens/BreathDebugScreen';
 
 function HomeOrOnboarding() {
@@ -34,6 +35,7 @@ export function AppRoutes() {
       <Route path="/program" element={<Navigate to="/calendar" replace />} />
       <Route path="/breath-debug" element={<AppShell><BreathDebugScreen /></AppShell>} />
       <Route path="/settings" element={<AppShell><SettingsScreen /></AppShell>} />
+      <Route path="/privacy" element={<AppShell><PrivacyScreen /></AppShell>} />
     </Routes>
   );
 }

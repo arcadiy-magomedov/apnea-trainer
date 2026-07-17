@@ -9,16 +9,25 @@ import { emptyAppState } from '../../domain/models/appState';
 import { FakeClock } from '../../test/fakeClock';
 import { makeRound, makeSession } from '../../test/fixtures';
 import type { AppState } from '../../domain/models/types';
+import { FakeAnalyticsService } from '../../test/fakeAnalytics';
 
 const D = (iso: string) => new Date(iso).getTime();
 
-function renderCalendar(state: AppState, now: number) {
+function renderCalendar(
+  state: AppState,
+  now: number,
+  analytics = new FakeAnalyticsService(),
+) {
   const repository = {
     getState: vi.fn(async () => state),
     setState: vi.fn(async (_s: AppState) => {}),
   };
   render(
-    <ServicesProvider value={{ clock: new FakeClock(now), repository }}>
+    <ServicesProvider value={{
+      analytics,
+      clock: new FakeClock(now),
+      repository,
+    }}>
       <AppProviders>
         <MemoryRouter><CalendarScreen /></MemoryRouter>
       </AppProviders>
@@ -61,6 +70,9 @@ describe('CalendarScreen', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: /Calendar/i })).toBeInTheDocument(),
     );
+    expect(
+      document.querySelector('[data-ad-opportunity="calendar_inline"]'),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Provisional plan · 6 weeks/)).toBeInTheDocument();
     expect(screen.getAllByTestId('marker-completed').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByTestId('marker-planned').length).toBeGreaterThanOrEqual(1);
@@ -148,5 +160,38 @@ describe('CalendarScreen', () => {
     expect(o2.className).toContain('var(--teal)');
     expect(max.className).toContain('var(--warn)');
     expect(rest.className).toContain('var(--text-mute)');
+  });
+
+  it('tracks one coarse relation event per selected day only', async () => {
+    const analytics = new FakeAnalyticsService();
+    renderCalendar(
+      stateWithBaselineAndSession(),
+      D('2026-07-10T10:00:00'),
+      analytics,
+    );
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId('marker-completed').length).toBeGreaterThanOrEqual(1),
+    );
+    expect(analytics.events).toEqual([]);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /July 9.*CO₂/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /July 10.*today/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /July 11/i }),
+    );
+
+    expect(analytics.events).toEqual([
+      { name: 'calendar_day_opened', dayRelation: 'past' },
+      { name: 'calendar_day_opened', dayRelation: 'today' },
+      { name: 'calendar_day_opened', dayRelation: 'future' },
+    ]);
+    expect(JSON.stringify(analytics.events)).not.toMatch(
+      /2026|07-0|07-1|dayKey|sessionId|"s1"|CO2/i,
+    );
   });
 });

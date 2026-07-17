@@ -7,16 +7,21 @@ import { AppProviders } from '../app/stores';
 import { SetGoalScreen } from './SetGoalScreen';
 import { makeBaseline, makeState } from '../../test/fixtures';
 import type { AppState } from '../../domain/models/types';
+import { FakeAnalyticsService } from '../../test/fakeAnalytics';
 
-function renderGoal(state = makeState({
-  baselines: [makeBaseline({ maxHoldSec: 180 })],
-}), setState = vi.fn(async (_state: AppState) => {})) {
+function renderGoal(
+  state = makeState({
+    baselines: [makeBaseline({ maxHoldSec: 180 })],
+  }),
+  setState = vi.fn(async (_state: AppState) => {}),
+  analytics = new FakeAnalyticsService(),
+) {
   const repository = {
     getState: vi.fn(async () => state),
     setState,
   };
   render(
-    <ServicesProvider value={{ repository }}>
+    <ServicesProvider value={{ analytics, repository }}>
       <AppProviders>
         <MemoryRouter initialEntries={['/goal']}>
           <Routes>
@@ -28,6 +33,19 @@ function renderGoal(state = makeState({
     </ServicesProvider>,
   );
   return setState;
+}
+
+function stateWithActiveGoal(): AppState {
+  return makeState({
+    baselines: [makeBaseline({ maxHoldSec: 180 })],
+    goal: {
+      id: 'goal-1',
+      targetHoldSec: 240,
+      createdAt: 1,
+      startMaxSec: 180,
+      achievedAt: null,
+    },
+  });
 }
 
 it('saves a valid mm:ss goal', async () => {
@@ -61,32 +79,82 @@ it('allows the optional post-baseline step to be skipped', async () => {
 });
 
 it('prefills an active goal for editing after hydration', async () => {
-  const state = makeState({
-    baselines: [makeBaseline({ maxHoldSec: 180 })],
-    goal: {
-      id: 'goal-1',
-      targetHoldSec: 240,
-      createdAt: 1,
-      startMaxSec: 180,
-      achievedAt: null,
-    },
-  });
-  renderGoal(state);
+  renderGoal(stateWithActiveGoal());
   expect(await screen.findByRole('heading', { name: /edit goal/i }))
     .toBeInTheDocument();
   expect(screen.getByLabelText(/target hold/i)).toHaveValue('4:00');
 });
 
 it('surfaces a goal persistence failure without navigating away', async () => {
+  const analytics = new FakeAnalyticsService();
   const setState = vi.fn(async () => {
     throw new Error('storage unavailable');
   });
   renderGoal(makeState({
     baselines: [makeBaseline({ maxHoldSec: 180 })],
-  }), setState);
+  }), setState, analytics);
   await userEvent.type(await screen.findByLabelText(/target hold/i), '4:00');
   await userEvent.click(screen.getByRole('button', { name: /save goal/i }));
 
   expect(await screen.findByText(/storage unavailable/i)).toBeInTheDocument();
   expect(screen.queryByText('home-root')).not.toBeInTheDocument();
+  expect(analytics.events).not.toContainEqual(
+    expect.objectContaining({ name: 'goal_created' }),
+  );
+  expect(analytics.events).not.toContainEqual(
+    expect.objectContaining({ name: 'goal_updated' }),
+  );
+});
+
+it('tracks creation of a new goal with a name-only event', async () => {
+  const analytics = new FakeAnalyticsService();
+  renderGoal(undefined, undefined, analytics);
+  await userEvent.type(
+    await screen.findByLabelText(/target hold/i),
+    '4:00',
+  );
+  await userEvent.click(screen.getByRole('button', { name: /save goal/i }));
+
+  await waitFor(() => {
+    expect(analytics.events).toEqual([{ name: 'goal_created' }]);
+  });
+  expect(JSON.stringify(analytics.events)).not.toMatch(
+    /target|baseline|goalId|goal-1|240|180/i,
+  );
+});
+
+it('tracks updates to an active goal with a name-only event', async () => {
+  const analytics = new FakeAnalyticsService();
+  renderGoal(stateWithActiveGoal(), undefined, analytics);
+  await userEvent.clear(await screen.findByLabelText(/target hold/i));
+  await userEvent.type(screen.getByLabelText(/target hold/i), '4:10');
+  await userEvent.click(screen.getByRole('button', { name: /save goal/i }));
+
+  await waitFor(() => {
+    expect(analytics.events).toEqual([{ name: 'goal_updated' }]);
+  });
+});
+
+it('does not duplicate goal creation while persistence is in flight', async () => {
+  let release!: () => void;
+  const setState = vi.fn(() => new Promise<void>((resolve) => {
+    release = resolve;
+  }));
+  const analytics = new FakeAnalyticsService();
+  renderGoal(undefined, setState, analytics);
+  await userEvent.type(
+    await screen.findByLabelText(/target hold/i),
+    '4:00',
+  );
+
+  await userEvent.dblClick(
+    screen.getByRole('button', { name: /save goal/i }),
+  );
+  expect(setState).toHaveBeenCalledOnce();
+  expect(analytics.events).toEqual([]);
+
+  release();
+  await waitFor(() => {
+    expect(analytics.events).toEqual([{ name: 'goal_created' }]);
+  });
 });

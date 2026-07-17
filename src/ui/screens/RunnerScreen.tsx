@@ -12,6 +12,11 @@ import { APNEA_DEFAULTS } from '../../domain/apnea/config';
 import { useServices } from '../app/services';
 import { useRunnerStore } from '../app/stores';
 import { useCues } from '../hooks/useCues';
+import {
+  analyticsSessionType,
+  durationBucket,
+  type AnalyticsSessionType,
+} from '../../application/analytics/events';
 
 interface RunnerNavState {
   plan: SessionPlan;
@@ -39,7 +44,7 @@ export function RunnerScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = location.state as RunnerNavState | null;
-  const { clock, wakeLock } = useServices();
+  const { analytics, clock, wakeLock } = useServices();
   const cue = useCues();
   const start = useRunnerStore((s) => s.start);
   const storePlan = useRunnerStore((s) => s.plan);
@@ -57,6 +62,11 @@ export function RunnerScreen() {
   const roundEnding = useRef(false);
   const lastTick = useRef<number | null>(null);
   const holdAutoEnded = useRef(false);
+  const startingRef = useRef(false);
+  const startedRef = useRef(false);
+  const sessionStartedAtRef = useRef(0);
+  const sessionTypeRef = useRef<AnalyticsSessionType | null>(null);
+  const abandonmentSent = useRef(false);
 
   const navPlan = nav?.plan;
   const hasUsablePlan = !!navPlan && navPlan.rounds.length > 0;
@@ -83,24 +93,59 @@ export function RunnerScreen() {
     },
   });
 
-  // Release the wake lock when leaving the runner.
+  function trackAbandonment() {
+    if (
+      !startedRef.current
+      || hasFinished.current
+      || abandonmentSent.current
+      || sessionTypeRef.current === null
+    ) {
+      return;
+    }
+    abandonmentSent.current = true;
+    analytics.track({
+      name: 'training_session_abandoned',
+      sessionType: sessionTypeRef.current,
+      durationBucket: durationBucket(
+        sessionStartedAtRef.current,
+        clock.now(),
+      ),
+    });
+  }
+
   useEffect(() => {
-    return () => { void wakeLock.release(); };
+    return () => {
+      trackAbandonment();
+      void wakeLock.release();
+    };
+    // Services and refs are stable for one Runner mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function beginSession() {
-    if (started || !navPlan) return;
+    if (startedRef.current || startingRef.current || !navPlan) return;
+    startingRef.current = true;
+    sessionStartedAtRef.current = clock.now();
+    sessionTypeRef.current = analyticsSessionType(navPlan.type);
     // Inside the user gesture: unlock audio + acquire the wake lock (both required by iOS).
     cue.prime();
-    await wakeLock.acquire();
-    start(
-      navPlan,
-      nav?.difficultyLevel ?? 0,
-      nav?.earlyContractionThresholds ?? navPlan.rounds.map(() => 0.5),
-    );
-    timer.begin();
-    setStarted(true);
+    try {
+      await wakeLock.acquire();
+      start(
+        navPlan,
+        nav?.difficultyLevel ?? 0,
+        nav?.earlyContractionThresholds ?? navPlan.rounds.map(() => 0.5),
+      );
+      timer.begin();
+      startedRef.current = true;
+      analytics.track({
+        name: 'training_session_started',
+        sessionType: sessionTypeRef.current,
+      });
+      setStarted(true);
+    } finally {
+      startingRef.current = false;
+    }
   }
 
   // Advance only after the store update lands so recovery uses an adjusted plan.
@@ -184,6 +229,7 @@ export function RunnerScreen() {
   function cancel() {
     // Abort the session and leave; the wake lock is released on unmount and the
     // in-progress (unsaved) session is discarded.
+    trackAbandonment();
     navigate('/');
   }
 

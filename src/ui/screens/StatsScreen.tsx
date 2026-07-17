@@ -21,6 +21,7 @@ import {
   personalBestSec,
   weeklySessionCount,
 } from '../../application/stats';
+import { AdOpportunityProbe } from '../analytics/AdOpportunityProbe';
 
 export function StatsScreen() {
   const navigate = useNavigate();
@@ -99,6 +100,7 @@ export function StatsScreen() {
           Set a goal
         </Button>
       )}
+      <AdOpportunityProbe placement="stats_inline" surface="stats" />
       <Card>
         <div className="mb-2 text-xs uppercase tracking-wider text-[color:var(--text-mute)]">Recent sessions</div>
         {state.sessions.slice(-8).reverse().map((s) => (
