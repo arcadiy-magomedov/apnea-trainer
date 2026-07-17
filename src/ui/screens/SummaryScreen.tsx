@@ -8,6 +8,11 @@ import { formatMMSS } from '../design-system/format';
 import { useAppStore } from '../app/stores';
 import { useServices } from '../app/services';
 import { assessmentSchedule } from '../../domain/apnea/assessmentSchedule';
+import {
+  analyticsSessionType,
+  durationBucket,
+} from '../../application/analytics/events';
+import { AdOpportunityProbe } from '../analytics/AdOpportunityProbe';
 
 const RATINGS: Array<{ value: Rpe; label: string }> = [
   { value: 'easy', label: 'Easy and controlled' },
@@ -18,7 +23,7 @@ const RATINGS: Array<{ value: Rpe; label: string }> = [
 
 export function SummaryScreen() {
   const navigate = useNavigate();
-  const { clock } = useServices();
+  const { analytics, clock } = useServices();
   const completeSession = useAppStore((state) => state.completeSession);
   const session = (useLocation().state as { session: Session } | null)?.session;
   const alreadySaved = useAppStore((state) =>
@@ -55,6 +60,11 @@ export function SummaryScreen() {
     setSaveError(null);
     try {
       const result = await completeSession({ ...draft, rpe });
+      analytics.track({
+        name: 'training_session_completed',
+        sessionType: analyticsSessionType(draft.type),
+        durationBucket: durationBucket(draft.startedAt, draft.finishedAt),
+      });
       setCompletion(result);
     } catch (error) {
       setSaveError(
@@ -164,6 +174,9 @@ export function SummaryScreen() {
               </>
             )}
           </Card>
+          {completion !== null && (
+            <AdOpportunityProbe placement="summary_inline" surface="summary" />
+          )}
           <Button onClick={() => navigate('/', { replace: true })}>Done</Button>
         </>
       )}

@@ -10,6 +10,7 @@ import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { SummaryScreen } from '../screens/SummaryScreen';
 import { SetGoalScreen } from '../screens/SetGoalScreen';
+import { PrivacyScreen } from '../screens/PrivacyScreen';
 
 function HomeOrOnboarding() {
   const state = useAppStore((s) => s.state);
@@ -32,6 +33,7 @@ export function AppRoutes() {
       <Route path="/calendar" element={<AppShell><CalendarScreen /></AppShell>} />
       <Route path="/program" element={<Navigate to="/calendar" replace />} />
       <Route path="/settings" element={<AppShell><SettingsScreen /></AppShell>} />
+      <Route path="/privacy" element={<AppShell><PrivacyScreen /></AppShell>} />
     </Routes>
   );
 }

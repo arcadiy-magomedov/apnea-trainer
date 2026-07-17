@@ -7,10 +7,12 @@ import { Button } from '../design-system/Button';
 import { CalendarDayDrawer } from '../components/CalendarDayDrawer';
 import { completedCalendarEvents, plannedCalendarEvents } from '../../application/calendar/trainingCalendar';
 import { addCalendarMonths, localDateKey, startOfDay, startOfLocalMonth } from '../../domain/apnea/time';
+import { dayRelation } from '../../application/analytics/events';
+import { AdOpportunityProbe } from '../analytics/AdOpportunityProbe';
 
 export function CalendarScreen() {
   const navigate = useNavigate();
-  const { clock } = useServices();
+  const { analytics, clock } = useServices();
   const state = useAppStore((store) => store.state);
   const hydrated = useAppStore((store) => store.hydrated);
   const now = startOfDay(clock.now());
@@ -79,7 +81,13 @@ export function CalendarScreen() {
         today={now}
         selectedDayKey={selectedDayKey}
         events={events}
-        onSelectDay={setSelectedDayKey}
+        onSelectDay={(dayKey) => {
+          setSelectedDayKey(dayKey);
+          analytics.track({
+            name: 'calendar_day_opened',
+            dayRelation: dayRelation(dayKey, localDateKey(now)),
+          });
+        }}
         onPreviousMonth={() => setVisibleMonth((m) => addCalendarMonths(m, -1))}
         onNextMonth={() => setVisibleMonth((m) => addCalendarMonths(m, 1))}
       />
@@ -97,6 +105,7 @@ export function CalendarScreen() {
       )}
 
       {/* 6. Day drawer */}
+      <AdOpportunityProbe placement="calendar_inline" surface="calendar" />
       <CalendarDayDrawer dayKey={selectedDayKey} events={selectedEvents} />
     </div>
   );

@@ -4,15 +4,20 @@ import { MemoryRouter } from 'react-router-dom';
 import { ServicesProvider } from './services';
 import { AppProviders } from './stores';
 import { AppRoutes } from './routes';
+import {
+  AnalyticsConsentProvider,
+} from '../analytics/AnalyticsConsentProvider';
 
 function renderAt(path: string) {
   return render(
     <ServicesProvider>
-      <AppProviders>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-        </MemoryRouter>
-      </AppProviders>
+      <AnalyticsConsentProvider>
+        <AppProviders>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AppProviders>
+      </AnalyticsConsentProvider>
     </ServicesProvider>,
   );
 }
@@ -40,6 +45,12 @@ describe('routing', () => {
   it('redirects legacy /program links to Calendar', async () => {
     renderAt('/program');
     expect(await screen.findByRole('heading', { name: 'Calendar' }))
+      .toBeInTheDocument();
+  });
+
+  it('renders Privacy at /privacy', async () => {
+    renderAt('/privacy');
+    expect(await screen.findByRole('heading', { name: /privacy/i }))
       .toBeInTheDocument();
   });
 });

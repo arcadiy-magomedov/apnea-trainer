@@ -32,6 +32,9 @@ it('shows independent levels and the active weekly profile', async () => {
   renderStats(state);
 
   await waitFor(() => expect(screen.getByText('CO₂ level')).toBeInTheDocument());
+  expect(
+    document.querySelector('[data-ad-opportunity="stats_inline"]'),
+  ).toBeInTheDocument();
   expect(screen.getByText('3')).toBeInTheDocument();
   expect(screen.getByText('CO₂-heavy')).toBeInTheDocument();
 });

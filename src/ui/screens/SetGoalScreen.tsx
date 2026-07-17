@@ -6,9 +6,11 @@ import { useAppStore } from '../app/stores';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
 import { formatMMSS, parseMMSS } from '../design-system/format';
+import { useServices } from '../app/services';
 
 export function SetGoalScreen() {
   const navigate = useNavigate();
+  const { analytics } = useServices();
   const hydrated = useAppStore((store) => store.hydrated);
   const state = useAppStore((store) => store.state);
   const saveGoal = useAppStore((store) => store.setGoal);
@@ -33,11 +35,13 @@ export function SetGoalScreen() {
 
   async function save() {
     if (target === null || savingRef.current) return;
+    const wasEditing = editing;
     savingRef.current = true;
     setSaving(true);
     setSaveError(null);
     try {
       await saveGoal(target);
+      analytics.track({ name: wasEditing ? 'goal_updated' : 'goal_created' });
       navigate('/');
     } catch (error) {
       setSaveError(

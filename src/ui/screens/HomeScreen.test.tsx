@@ -49,6 +49,9 @@ it('removes duplicate headings and Stats metrics from Home', async () => {
     expect(screen.getByRole('button', { name: /start CO₂ session/i }))
       .toBeInTheDocument(),
   );
+  expect(
+    document.querySelector('[data-ad-opportunity="home_inline"]'),
+  ).toBeInTheDocument();
   expect(screen.queryByText(/ready to train/i)).not.toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: /apnea trainer/i }))
     .not.toBeInTheDocument();

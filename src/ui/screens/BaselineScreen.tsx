@@ -1,20 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
 import { ProgressRing } from '../design-system/ProgressRing';
 import { formatMMSS } from '../design-system/format';
 import { useCountUp } from '../hooks/useCountUp';
+import { useServices } from '../app/services';
 import { useAppStore } from '../app/stores';
 
 export function BaselineScreen() {
   const navigate = useNavigate();
+  const { analytics } = useServices();
   const record = useAppStore((s) => s.recordBaseline);
   const hydrated = useAppStore((state) => state.hydrated);
   const hadBaseline = useAppStore((state) => state.state.baselines.length > 0);
   const { seconds, running, start, stop, reset } = useCountUp();
   const [attempts, setAttempts] = useState<number[]>([]);
   const [firstContraction, setFirstContraction] = useState<number | null>(null);
+  const baselineStarted = useRef(false);
+  const baselineSaving = useRef(false);
+  const baselineCompleted = useRef(false);
+  const baselineMounted = useRef(true);
+
+  useEffect(() => {
+    baselineMounted.current = true;
+    return () => {
+      baselineMounted.current = false;
+      if (baselineStarted.current && !baselineCompleted.current) {
+        analytics.track({ name: 'baseline_abandoned' });
+      }
+    };
+  }, [analytics]);
 
   if (!hydrated) return null;
 
@@ -24,8 +40,26 @@ export function BaselineScreen() {
     reset();
   }
 
+  function startBaseline() {
+    if (!baselineStarted.current) {
+      baselineStarted.current = true;
+      analytics.track({ name: 'baseline_started' });
+    }
+    start();
+  }
+
   async function finish() {
-    await record(attempts, firstContraction);
+    if (baselineSaving.current || baselineCompleted.current) return;
+    baselineSaving.current = true;
+    try {
+      await record(attempts, firstContraction);
+    } catch {
+      baselineSaving.current = false;
+      return;
+    }
+    if (!baselineMounted.current) return;
+    baselineCompleted.current = true;
+    analytics.track({ name: 'baseline_completed' });
     navigate(hadBaseline ? '/' : '/goal');
   }
 
@@ -41,7 +75,7 @@ export function BaselineScreen() {
         <Button variant="ghost" onClick={() => setFirstContraction(seconds)}>Mark first contraction</Button>
       )}
       {!running
-        ? <Button onClick={start}>Start hold</Button>
+        ? <Button onClick={startBaseline}>Start hold</Button>
         : <Button variant="danger" onClick={onStop}>Stop</Button>}
       <Card>
         {attempts.length === 0

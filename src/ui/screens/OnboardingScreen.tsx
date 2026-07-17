@@ -1,16 +1,27 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
+import { useServices } from '../app/services';
 import { useAppStore } from '../app/stores';
 
 export function OnboardingScreen() {
   const [acked, setAcked] = useState(false);
+  const saving = useRef(false);
   const navigate = useNavigate();
+  const { analytics } = useServices();
   const updateSettings = useAppStore((s) => s.updateSettings);
 
   async function acknowledge() {
-    await updateSettings({ onboarded: true });
+    if (saving.current) return;
+    saving.current = true;
+    try {
+      await updateSettings({ onboarded: true });
+    } catch {
+      saving.current = false;
+      return;
+    }
+    analytics.track({ name: 'onboarding_completed' });
     navigate('/baseline');
   }
   return (

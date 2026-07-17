@@ -7,6 +7,7 @@ import { goalForecast } from '../../domain/apnea/goalEngine';
 import { GoalCard } from '../components/GoalCard';
 import { HomeHeroDock } from '../components/HomeHeroDock';
 import { AppShell } from '../app/AppShell';
+import { AdOpportunityProbe } from '../analytics/AdOpportunityProbe';
 
 export function HomeScreen() {
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ export function HomeScreen() {
             Set a max-hold goal
           </Button>
         )}
+        <AdOpportunityProbe placement="home_inline" surface="home" />
       </div>
     </AppShell>
   );
