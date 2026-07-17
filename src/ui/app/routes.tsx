@@ -11,6 +11,7 @@ import { CalendarScreen } from '../screens/CalendarScreen';
 import { SummaryScreen } from '../screens/SummaryScreen';
 import { SetGoalScreen } from '../screens/SetGoalScreen';
 import { PrivacyScreen } from '../screens/PrivacyScreen';
+import { BreathDebugScreen } from '../screens/BreathDebugScreen';
 
 function HomeOrOnboarding() {
   const state = useAppStore((s) => s.state);
@@ -32,6 +33,7 @@ export function AppRoutes() {
       <Route path="/stats" element={<AppShell><StatsScreen /></AppShell>} />
       <Route path="/calendar" element={<AppShell><CalendarScreen /></AppShell>} />
       <Route path="/program" element={<Navigate to="/calendar" replace />} />
+      <Route path="/breath-debug" element={<AppShell><BreathDebugScreen /></AppShell>} />
       <Route path="/settings" element={<AppShell><SettingsScreen /></AppShell>} />
       <Route path="/privacy" element={<AppShell><PrivacyScreen /></AppShell>} />
     </Routes>

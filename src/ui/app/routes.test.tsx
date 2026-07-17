@@ -42,6 +42,12 @@ describe('routing', () => {
       .toBeInTheDocument();
   });
 
+  it('renders the breath sonar screen at /breath-debug', async () => {
+    renderAt('/breath-debug');
+    expect(await screen.findByRole('heading', { name: /breath sonar/i, level: 2 }))
+      .toBeInTheDocument();
+  });
+
   it('redirects legacy /program links to Calendar', async () => {
     renderAt('/program');
     expect(await screen.findByRole('heading', { name: 'Calendar' }))
